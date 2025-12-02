@@ -64,7 +64,7 @@
             <p>Conectando ao banco de dados...</p>
         </div>
 
-        <!-- LOGIN -->
+        <!-- TELA DE LOGIN (SEM OPÇÃO DE CADASTRO) -->
         <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4">
             <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
                 <div class="text-center mb-8">
@@ -74,18 +74,45 @@
                     <h1 class="text-2xl font-bold text-gray-800">NeuroRehab Manager</h1>
                     <p class="text-gray-500 text-sm mt-1">Acesso Restrito à Equipe Clínica</p>
                 </div>
+                
                 <form @submit.prevent="handleLogin" class="space-y-6">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label><input v-model="loginForm.email" type="email" required class="block w-full rounded-md border-gray-300 p-2.5 border focus:ring-2 focus:ring-medical-500 outline-none"></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Senha</label><input v-model="loginForm.password" type="password" required class="block w-full rounded-md border-gray-300 p-2.5 border focus:ring-2 focus:ring-medical-500 outline-none"></div>
-                    <button type="submit" :disabled="isLoggingIn" class="w-full py-2.5 px-4 rounded-md text-white bg-medical-600 hover:bg-medical-700 disabled:opacity-50 transition-colors">
-                        {{ isLoggingIn ? 'Entrando...' : 'Acessar' }}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Profissional</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                <i class="fas fa-envelope"></i>
+                            </span>
+                            <input v-model="loginForm.email" type="email" required 
+                                   class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"
+                                   placeholder="nome@hospital.com">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input v-model="loginForm.password" type="password" required 
+                                   class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"
+                                   placeholder="••••••••">
+                        </div>
+                    </div>
+
+                    <button type="submit" :disabled="isLoggingIn" class="w-full flex justify-center py-2.5 px-4 rounded-md text-white bg-medical-600 hover:bg-medical-700 disabled:opacity-50 transition-colors shadow-sm font-medium">
+                        <i v-if="isLoggingIn" class="fas fa-circle-notch fa-spin mr-2 mt-1"></i>
+                        {{ isLoggingIn ? 'Verificando credenciais...' : 'Acessar Sistema' }}
                     </button>
-                    <!-- Sem informações de demo pois agora é real -->
+                    
+                    <div class="text-center text-xs text-gray-400 mt-4 border-t pt-4">
+                        <p><i class="fas fa-info-circle mr-1"></i> Cadastro de novos usuários deve ser solicitado à administração.</p>
+                    </div>
                 </form>
             </div>
         </div>
 
-        <!-- DASHBOARD -->
+        <!-- DASHBOARD (ÁREA LOGADA) -->
         <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
             <aside class="w-64 bg-white shadow-md flex-col hidden md:flex z-10">
@@ -380,7 +407,7 @@
                 const patients = ref([]);
                 const notifications = ref([]);
                 const loginForm = ref({ email: '', password: '' });
-                const selectedPatientId = ref(null); // ID only to be reactive safe
+                const selectedPatientId = ref(null);
                 const activeTab = ref('timeline');
                 const newEvolutionText = ref('');
                 const isIntercurrence = ref(false);
@@ -391,7 +418,6 @@
                 });
                 const newPendency = ref({ category: 'Clínica Médica', description: '' });
 
-                // Computed para achar o paciente selecionado na lista atual
                 const selectedPatient = computed(() => {
                     return patients.value.find(p => p.id === selectedPatientId.value) || null;
                 });
@@ -402,7 +428,7 @@
                     if (user) {
                         currentUser.value = user;
                         isAuthenticated.value = true;
-                        loadPatients(); // Inicia listener do banco
+                        loadPatients();
                     } else {
                         currentUser.value = null;
                         isAuthenticated.value = false;
@@ -437,7 +463,6 @@
                         patients.value = snapshot.docs.map(doc => ({
                             id: doc.id,
                             ...doc.data(),
-                            // Garante estrutura mesmo se banco estiver incompleto
                             evolutions: doc.data().evolutions || [],
                             pendencies: doc.data().pendencies || [],
                             carePlan: doc.data().carePlan || { goals: '', estimatedDate: '' },
@@ -449,7 +474,7 @@
                 const updatePatientDoc = async (patientData) => {
                     if (!patientData || !patientData.id) return;
                     try {
-                        const { id, ...data } = patientData; // Separa ID do resto
+                        const { id, ...data } = patientData;
                         const docRef = doc(db, 'patients', id);
                         await updateDoc(docRef, data);
                     } catch (e) {
@@ -485,7 +510,6 @@
                 const addEvolution = async () => {
                     if (!newEvolutionText.value.trim() || !selectedPatient.value) return;
                     
-                    // Clonamos para não afetar reatividade diretamente antes do update
                     const updatedEvolutions = [{
                         date: new Date().toISOString(),
                         note: newEvolutionText.value,
@@ -529,8 +553,6 @@
                 };
 
                 const reactivatePatient = async (patient) => {
-                    // Update field deletion logic for firestore usually needs FieldValue.delete(), 
-                    // but simply setting undefined or null works for our simple logic check
                     await updatePatientDoc({ 
                         id: patient.id,
                         status: 'active',
