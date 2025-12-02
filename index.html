@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroRehab Manager 3.4 (Resolução)</title>
+    <title>NeuroRehab Manager 3.5 (Admissões)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -199,12 +199,16 @@
                                 </div>
                             </div>
                             
+                            <!-- ACTIONS -->
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-end gap-2" v-if="patient.status === 'active'">
                                 <button @click.stop="dischargePatient(patient)" class="text-sm text-medical-600 hover:text-medical-800 font-medium px-3 py-1.5 rounded hover:bg-medical-50 z-10 transition-colors"><i class="fas fa-check-circle mr-1"></i> Dar Alta</button>
                             </div>
+                            <!-- BOTÃO DE NOVA INTERNAÇÃO (SUBSTITUIU READMITIR) -->
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-between items-center text-xs text-gray-500" v-else>
                                 <span>Alta em: {{ formatDate(patient.dischargeDate) }}</span>
-                                <button @click.stop="reactivatePatient(patient)" class="text-blue-600 hover:underline z-10">Readmitir</button>
+                                <button @click.stop="startNewAdmission(patient)" class="text-blue-600 hover:underline z-10 font-bold">
+                                    <i class="fas fa-file-medical mr-1"></i> Nova Internação
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -212,13 +216,13 @@
             </main>
         </div>
 
-        <!-- MODAL NOVO PACIENTE -->
+        <!-- MODAL NOVO PACIENTE (AGORA TAMBÉM SERVE PARA READMISSÃO) -->
         <div v-if="showModal" class="fixed inset-0 z-40 overflow-y-auto">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeModal"></div>
                 <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full relative z-50">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Adicionar Paciente</h3>
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Adicionar Paciente / Nova Internação</h3>
                         <div class="space-y-4">
                             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4">
                                 <label class="block text-sm font-bold text-blue-800 mb-1">Data da Internação</label>
@@ -247,7 +251,7 @@
                         </div>
                     </div>
                     <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button type="button" @click="addPatient" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-medical-600 text-base font-medium text-white hover:bg-medical-700 sm:ml-3 sm:w-auto sm:text-sm">Salvar</button>
+                        <button type="button" @click="addPatient" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-medical-600 text-base font-medium text-white hover:bg-medical-700 sm:ml-3 sm:w-auto sm:text-sm">Confirmar Internação</button>
                         <button type="button" @click="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
                     </div>
                 </div>
@@ -489,10 +493,7 @@
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
                     
-                    // 1. Atualiza Paciente (Remove Tarja Vermelha)
                     batch.update(doc(db, 'patients', pid), { hasActiveIntercurrence: false });
-                    
-                    // 2. Atualiza Evolução (Marca como Resolvida)
                     batch.update(doc(db, 'patients', pid, 'evolutions', evo.id), { resolved: true });
                     
                     try {
@@ -518,6 +519,19 @@
                         date: date, note: newPatient.value.notes || 'Admissão', author: currentUser.value.email, type: 'routine'
                     });
                     try { await batch.commit(); showNotification('Cadastrado!', 'success'); closeModal(); } catch (e) { showNotification('Erro ao criar.', 'error'); }
+                };
+
+                const startNewAdmission = (p) => {
+                    newPatient.value = {
+                        name: p.name,
+                        recordNumber: p.recordNumber,
+                        age: p.age,
+                        bed: '',
+                        diagnosis: p.diagnosis,
+                        notes: 'Nova admissão (Paciente readmitido)',
+                        admissionDate: getToday()
+                    };
+                    showModal.value = true;
                 };
 
                 const addEvolution = async () => {
@@ -584,7 +598,6 @@
                 };
 
                 const dischargePatient = async (p) => { await updatePatientDoc({ id: p.id, status: 'discharged', dischargeDate: new Date().toISOString() }); showNotification("Alta registrada.", "success"); };
-                const reactivatePatient = async (p) => { await updatePatientDoc({ id: p.id, status: 'active', dischargeDate: null }); showNotification("Readmitido.", "success"); };
                 const copySummary = async () => { try { await navigator.clipboard.writeText(selectedPatient.value.dischargeSummary); showNotification('Copiado!', 'success'); } catch (e) { showNotification('Erro.', 'error'); } };
 
                 const getCategoryColor = (cat) => ({'Neurologia':'bg-purple-100 text-purple-800','Clínica Médica':'bg-blue-100 text-blue-800','Qualquer médico':'bg-green-100 text-green-800'}[cat] || 'bg-gray-100');
@@ -617,7 +630,7 @@
                     isAuthenticated, isLoading, isLoggingIn, currentUser, loginForm, handleLogin, logout,
                     showHistory, showModal, openModal, closeModal, selectedPatient,
                     patients, filteredPatients, activePatients, newPatient, addPatient,
-                    dischargePatient, reactivatePatient, activeTab, newEvolutionText, isIntercurrence, addEvolution,
+                    dischargePatient, startNewAdmission, activeTab, newEvolutionText, isIntercurrence, addEvolution,
                     newPendency, addPendency, deletePendency, copySummary, getCategoryColor, getInitials, formatDate,
                     savePatients: updatePatientDoc, notifications, currentEvolutions, currentPendencies, searchQuery, openPatientDetails, closePatientDetails,
                     resolveIntercurrence
