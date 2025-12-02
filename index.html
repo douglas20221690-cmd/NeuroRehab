@@ -64,7 +64,7 @@
             <p>Conectando ao banco de dados...</p>
         </div>
 
-        <!-- TELA DE LOGIN (SEM OPÇÃO DE CADASTRO) -->
+        <!-- TELA DE LOGIN -->
         <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4">
             <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
                 <div class="text-center mb-8">
@@ -79,32 +79,21 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Profissional</label>
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                                <i class="fas fa-envelope"></i>
-                            </span>
-                            <input v-model="loginForm.email" type="email" required 
-                                   class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"
-                                   placeholder="nome@hospital.com">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-envelope"></i></span>
+                            <input v-model="loginForm.email" type="email" required class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm" placeholder="nome@hospital.com">
                         </div>
                     </div>
-
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                                <i class="fas fa-lock"></i>
-                            </span>
-                            <input v-model="loginForm.password" type="password" required 
-                                   class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"
-                                   placeholder="••••••••">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-lock"></i></span>
+                            <input v-model="loginForm.password" type="password" required class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm" placeholder="••••••••">
                         </div>
                     </div>
-
                     <button type="submit" :disabled="isLoggingIn" class="w-full flex justify-center py-2.5 px-4 rounded-md text-white bg-medical-600 hover:bg-medical-700 disabled:opacity-50 transition-colors shadow-sm font-medium">
                         <i v-if="isLoggingIn" class="fas fa-circle-notch fa-spin mr-2 mt-1"></i>
                         {{ isLoggingIn ? 'Verificando credenciais...' : 'Acessar Sistema' }}
                     </button>
-                    
                     <div class="text-center text-xs text-gray-400 mt-4 border-t pt-4">
                         <p><i class="fas fa-info-circle mr-1"></i> Cadastro de novos usuários deve ser solicitado à administração.</p>
                     </div>
@@ -112,7 +101,7 @@
             </div>
         </div>
 
-        <!-- DASHBOARD (ÁREA LOGADA) -->
+        <!-- DASHBOARD -->
         <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
             <aside class="w-64 bg-white shadow-md flex-col hidden md:flex z-10">
@@ -152,13 +141,13 @@
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div v-for="patient in filteredPatients" :key="patient.id" @click="openPatientDetails(patient)" class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md cursor-pointer transition-all flex flex-col relative group">
                             
-                            <div v-if="hasRecentIntercurrence(patient)" class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md z-30 flex items-center gap-1 animate-pulse">
+                            <div v-if="patient.hasActiveIntercurrence" class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md z-30 flex items-center gap-1 animate-pulse">
                                 <i class="fas fa-exclamation-triangle"></i> INTERCORRÊNCIA ATIVA
                             </div>
 
                             <div class="p-5 border-b border-gray-100 flex justify-between items-start">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="hasRecentIntercurrence(patient) ? 'border-red-400 text-red-600 bg-red-50' : 'border-transparent'">{{ getInitials(patient.name) }}</div>
+                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : 'border-transparent'">{{ getInitials(patient.name) }}</div>
                                     <div class="overflow-hidden">
                                         <h3 class="font-bold text-gray-800 truncate">{{ patient.name }}</h3>
                                         <div class="flex flex-col">
@@ -174,14 +163,15 @@
                                 <div class="text-sm"><span class="text-gray-400 block text-xs uppercase tracking-wider">Diagnóstico</span><span class="font-medium text-gray-700">{{ patient.diagnosis }}</span></div>
                                 <div class="text-sm"><span class="text-gray-400 block text-xs uppercase tracking-wider">Leito</span><span class="text-gray-600">{{ patient.bed }}</span></div>
                                 
-                                <div v-if="countPendingTasks(patient) > 0" class="mt-2 bg-yellow-50 rounded-md border border-yellow-100 p-2.5">
+                                <!-- Seção de Pendências (Resumo no Card) -->
+                                <div v-if="patient.pendingCount > 0" class="mt-2 bg-yellow-50 rounded-md border border-yellow-100 p-2.5">
                                     <div class="flex justify-between items-center mb-1">
                                         <span class="text-xs font-bold text-yellow-800 flex items-center"><i class="fas fa-tasks mr-1"></i> Pendências</span>
-                                        <span class="bg-yellow-200 text-yellow-800 text-[10px] px-1.5 rounded-full font-bold">{{ countPendingTasks(patient) }}</span>
+                                        <span class="bg-yellow-200 text-yellow-800 text-[10px] px-1.5 rounded-full font-bold">{{ patient.pendingCount }}</span>
                                     </div>
                                     <ul class="space-y-1">
-                                        <li v-for="task in getPendingTasksList(patient)" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate">
-                                            <i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5"></i> 
+                                        <li v-for="task in patient.pendingPreview" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate">
+                                            <i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5 flex-shrink-0"></i> 
                                             <span class="truncate">{{ task.description }}</span>
                                         </li>
                                     </ul>
@@ -274,18 +264,18 @@
                     <!-- Abas -->
                     <div class="bg-white border-b border-gray-200 px-6 flex items-end space-x-6 pt-2">
                         <button @click="activeTab = 'timeline'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors', activeTab === 'timeline' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-history mr-2"></i> Evolução</button>
-                        <button @click="activeTab = 'pendencies'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors', activeTab === 'pendencies' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-tasks mr-2"></i> Pendências <span v-if="countPendingTasks(selectedPatient) > 0" class="ml-1 bg-medical-warn-600 text-white text-[10px] px-1.5 rounded-full">{{ countPendingTasks(selectedPatient) }}</span></button>
+                        <button @click="activeTab = 'pendencies'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors', activeTab === 'pendencies' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-tasks mr-2"></i> Pendências <span v-if="currentPendencies.length > 0" class="ml-1 bg-medical-warn-600 text-white text-[10px] px-1.5 rounded-full">{{ currentPendencies.length }}</span></button>
                         <button @click="activeTab = 'careplan'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors', activeTab === 'careplan' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-clipboard-list mr-2"></i> Plano Terapêutico</button>
                         <button @click="activeTab = 'summary'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors', activeTab === 'summary' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-file-medical-alt mr-2"></i> Resumo de Alta</button>
                     </div>
 
                     <!-- Conteúdo -->
                     <div class="flex-grow overflow-hidden bg-gray-50 relative">
-                        <!-- 1: TIMELINE -->
+                        <!-- 1: TIMELINE (SUBCOLEÇÃO) -->
                         <div v-if="activeTab === 'timeline'" class="absolute inset-0 flex">
                             <div class="w-full md:w-2/3 p-6 overflow-y-auto custom-scrollbar">
-                                <div v-if="selectedPatient.evolutions && selectedPatient.evolutions.length > 0" class="space-y-6">
-                                    <div v-for="(evo, index) in selectedPatient.evolutions" :key="index" class="relative pl-6 border-l-2 ml-2" :class="evo.type === 'intercurrence' ? 'border-medical-alert-500' : 'border-gray-300'">
+                                <div v-if="currentEvolutions.length > 0" class="space-y-6">
+                                    <div v-for="evo in currentEvolutions" :key="evo.id" class="relative pl-6 border-l-2 ml-2" :class="evo.type === 'intercurrence' ? 'border-medical-alert-500' : 'border-gray-300'">
                                         <div :class="['absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white', evo.type === 'intercurrence' ? 'bg-medical-alert-600' : 'bg-medical-500']"></div>
                                         <div :class="['p-4 rounded-lg shadow-sm border', evo.type === 'intercurrence' ? 'bg-medical-alert-50 border-medical-alert-100' : 'bg-white border-gray-100']">
                                             <div class="flex justify-between items-center mb-2">
@@ -296,7 +286,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div v-else class="text-center text-gray-500 py-10">Nenhuma evolução registrada.</div>
+                                <div v-else class="text-center text-gray-500 py-10">Carregando histórico... ou nenhuma evolução registrada.</div>
                             </div>
                             <div class="w-full md:w-1/3 p-6 bg-white border-l border-gray-200 flex flex-col shadow-inner">
                                 <h4 class="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wider text-medical-600">Nova Nota</h4>
@@ -310,19 +300,19 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- 2: PENDÊNCIAS -->
+                        <!-- 2: PENDÊNCIAS (SUBCOLEÇÃO) -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center justify-between"><span><i class="fas fa-list-ul text-medical-600 mr-2"></i> Lista de Pendências</span><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{{ countPendingTasks(selectedPatient) }} abertas</span></h4>
+                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center justify-between"><span><i class="fas fa-list-ul text-medical-600 mr-2"></i> Lista de Pendências</span><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{{ currentPendencies.length }} abertas</span></h4>
                                     <div class="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                                        <div v-for="(task, idx) in selectedPatient.pendencies" :key="idx" :class="['p-3 rounded border flex items-start gap-3', task.done ? 'bg-gray-50 opacity-60' : 'bg-white hover:border-medical-300']">
-                                            <input type="checkbox" v-model="task.done" @change="savePatients(selectedPatient)" class="mt-1 h-4 w-4 text-medical-600 rounded cursor-pointer">
+                                        <div v-for="task in currentPendencies" :key="task.id" :class="['p-3 rounded border flex items-start gap-3', 'bg-white hover:border-medical-300']">
+                                            <!-- Checkbox desativado visualmente, remoção é deletar -->
                                             <div class="flex-grow">
-                                                <p :class="['text-sm', task.done ? 'line-through text-gray-400' : 'text-gray-800']">{{ task.description }}</p>
+                                                <p class="text-sm text-gray-800">{{ task.description }}</p>
                                                 <div class="flex items-center gap-2 mt-1"><span :class="['text-[10px] px-1.5 py-0.5 rounded font-medium', getCategoryColor(task.category)]">{{ task.category }}</span></div>
                                             </div>
-                                            <button @click="deletePendency(idx)" class="text-gray-300 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+                                            <button @click="deletePendency(task.id)" class="text-gray-300 hover:text-red-500" title="Concluir/Remover"><i class="fas fa-check-circle text-lg"></i></button>
                                         </div>
                                     </div>
                                 </div>
@@ -336,7 +326,7 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- 3: PLANO TERAPÊUTICO -->
+                        <!-- 3: PLANO TERAPÊUTICO (CAMPO PAI) -->
                         <div v-if="activeTab === 'careplan'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                                 <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -356,7 +346,7 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- 4: RESUMO DE ALTA -->
+                        <!-- 4: RESUMO DE ALTA (CAMPO PAI) -->
                         <div v-if="activeTab === 'summary'" class="absolute inset-0 flex flex-col p-6">
                             <div class="bg-white flex-grow flex flex-col rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                                 <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
@@ -379,7 +369,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC7SO3tcBRmWpcOYSIOlq2u993pwQxkLTg",
@@ -394,7 +384,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, watch } = Vue;
 
         createApp({
             setup() {
@@ -412,6 +402,12 @@
                 const newEvolutionText = ref('');
                 const isIntercurrence = ref(false);
                 
+                // Subcollections State (Real-time data for detailed view)
+                const currentEvolutions = ref([]);
+                const currentPendencies = ref([]);
+                let unsubscribeEvolutions = null;
+                let unsubscribePendencies = null;
+
                 const getToday = () => new Date().toISOString().split('T')[0];
                 const newPatient = ref({
                     name: '', recordNumber: '', age: '', bed: '', diagnosis: '', notes: '', admissionDate: getToday()
@@ -456,21 +452,49 @@
                     showNotification('Sessão encerrada.', 'success');
                 };
 
-                // FIRESTORE
+                // FIRESTORE: LOAD MAIN LIST
                 const loadPatients = () => {
                     const q = query(collection(db, 'patients'), orderBy('admissionDate', 'desc'));
                     onSnapshot(q, (snapshot) => {
                         patients.value = snapshot.docs.map(doc => ({
                             id: doc.id,
                             ...doc.data(),
-                            evolutions: doc.data().evolutions || [],
-                            pendencies: doc.data().pendencies || [],
                             carePlan: doc.data().carePlan || { goals: '', estimatedDate: '' },
-                            dischargeSummary: doc.data().dischargeSummary || ''
+                            dischargeSummary: doc.data().dischargeSummary || '',
+                            // Fallback for visual summary if not present
+                            pendingPreview: doc.data().pendingPreview || [],
+                            pendingCount: doc.data().pendingCount || 0,
+                            hasActiveIntercurrence: doc.data().hasActiveIntercurrence || false
                         }));
                     });
                 };
 
+                // FIRESTORE: LOAD DETAILS (SUBCOLLECTIONS)
+                const openPatientDetails = (p) => {
+                    selectedPatientId.value = p.id;
+                    activeTab.value = 'timeline';
+                    
+                    // Setup listeners for subcollections
+                    const evolutionsRef = query(collection(db, 'patients', p.id, 'evolutions'), orderBy('date', 'desc'));
+                    unsubscribeEvolutions = onSnapshot(evolutionsRef, (snap) => {
+                        currentEvolutions.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    });
+
+                    const pendenciesRef = collection(db, 'patients', p.id, 'pendencies');
+                    unsubscribePendencies = onSnapshot(pendenciesRef, (snap) => {
+                        currentPendencies.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    });
+                };
+
+                const closePatientDetails = () => {
+                    selectedPatientId.value = null;
+                    currentEvolutions.value = [];
+                    currentPendencies.value = [];
+                    if (unsubscribeEvolutions) unsubscribeEvolutions();
+                    if (unsubscribePendencies) unsubscribePendencies();
+                };
+
+                // ACTIONS with BATCH WRITE (Atomicity)
                 const updatePatientDoc = async (patientData) => {
                     if (!patientData || !patientData.id) return;
                     try {
@@ -478,28 +502,41 @@
                         const docRef = doc(db, 'patients', id);
                         await updateDoc(docRef, data);
                     } catch (e) {
-                        console.error("Erro ao salvar:", e);
-                        showNotification("Erro de conexão ao salvar.", "error");
+                        console.error("Erro:", e);
+                        showNotification("Erro ao salvar.", "error");
                     }
                 };
 
-                // ACTIONS
                 const addPatient = async () => {
                     if (!newPatient.value.name) return showNotification('Nome obrigatório', 'error');
                     const finalAdmissionDate = newPatient.value.admissionDate ? new Date(newPatient.value.admissionDate).toISOString() : new Date().toISOString();
                     
-                    const pData = {
+                    // Create base patient
+                    const batch = writeBatch(db);
+                    const newPatientRef = doc(collection(db, 'patients'));
+                    
+                    batch.set(newPatientRef, {
                         ...newPatient.value,
                         admissionDate: finalAdmissionDate,
                         status: 'active',
-                        evolutions: [{ date: finalAdmissionDate, note: newPatient.value.notes || 'Admissão', author: currentUser.value.email, type: 'routine' }],
-                        pendencies: [],
                         carePlan: { goals: '', estimatedDate: '' },
-                        dischargeSummary: ''
-                    };
+                        dischargeSummary: '',
+                        pendingPreview: [],
+                        pendingCount: 0,
+                        hasActiveIntercurrence: false
+                    });
+
+                    // Add initial evolution note to subcollection
+                    const evoRef = doc(collection(db, 'patients', newPatientRef.id, 'evolutions'));
+                    batch.set(evoRef, {
+                        date: finalAdmissionDate,
+                        note: newPatient.value.notes || 'Admissão',
+                        author: currentUser.value.email,
+                        type: 'routine'
+                    });
 
                     try {
-                        await addDoc(collection(db, 'patients'), pData);
+                        await batch.commit();
                         showNotification('Paciente cadastrado', 'success');
                         closeModal();
                     } catch (e) {
@@ -508,39 +545,85 @@
                 };
 
                 const addEvolution = async () => {
-                    if (!newEvolutionText.value.trim() || !selectedPatient.value) return;
+                    if (!newEvolutionText.value.trim() || !selectedPatientId.value) return;
                     
-                    const updatedEvolutions = [{
+                    const batch = writeBatch(db);
+                    const patientId = selectedPatientId.value;
+                    
+                    // 1. Add to Subcollection
+                    const evoRef = doc(collection(db, 'patients', patientId, 'evolutions'));
+                    batch.set(evoRef, {
                         date: new Date().toISOString(),
                         note: newEvolutionText.value,
                         author: currentUser.value.email,
                         type: isIntercurrence.value ? 'intercurrence' : 'routine'
-                    }, ...selectedPatient.value.evolutions];
+                    });
 
-                    await updatePatientDoc({ ...selectedPatient.value, evolutions: updatedEvolutions });
+                    // 2. Update Parent (Summary for Dashboard)
+                    const patientRef = doc(db, 'patients', patientId);
+                    const updateData = {};
+                    if (isIntercurrence.value) {
+                        updateData.hasActiveIntercurrence = true;
+                    }
+                    batch.update(patientRef, updateData);
+
+                    await batch.commit();
                     
                     newEvolutionText.value = ''; isIntercurrence.value = false;
                     showNotification('Evolução salva!', 'success');
                 };
 
                 const addPendency = async () => {
-                    if (!selectedPatient.value) return;
-                    const updatedPendencies = [...selectedPatient.value.pendencies, {
+                    if (!selectedPatientId.value) return;
+                    
+                    const batch = writeBatch(db);
+                    const patientId = selectedPatientId.value;
+
+                    // 1. Add to Subcollection
+                    const pendRef = doc(collection(db, 'patients', patientId, 'pendencies'));
+                    const newPendData = {
                         description: newPendency.value.description,
                         category: newPendency.value.category,
                         date: new Date().toISOString(),
                         done: false
-                    }];
+                    };
+                    batch.set(pendRef, newPendData);
+
+                    // 2. Update Parent (Summary)
+                    // Note: Calculating "active count" accurately requires reading, but we can increment optimistically 
+                    // or just update the preview list. For simplicity in this app, we update the preview manually.
+                    const currentPreview = selectedPatient.value.pendingPreview || [];
+                    const newPreview = [newPendData, ...currentPreview].slice(0, 2); // Keep top 2
                     
-                    await updatePatientDoc({ ...selectedPatient.value, pendencies: updatedPendencies });
+                    batch.update(doc(db, 'patients', patientId), {
+                        pendingPreview: newPreview,
+                        pendingCount: (selectedPatient.value.pendingCount || 0) + 1
+                    });
+
+                    await batch.commit();
                     newPendency.value.description = '';
                     showNotification('Adicionado', 'success');
                 };
 
-                const deletePendency = async (idx) => {
-                    const pList = [...selectedPatient.value.pendencies];
-                    pList.splice(idx, 1);
-                    await updatePatientDoc({ ...selectedPatient.value, pendencies: pList });
+                const deletePendency = async (taskId) => {
+                    const batch = writeBatch(db);
+                    const patientId = selectedPatientId.value;
+
+                    // 1. Delete from Subcollection
+                    batch.delete(doc(db, 'patients', patientId, 'pendencies', taskId));
+
+                    // 2. Update Parent Summary
+                    // We simply reduce the count. Updating the preview perfectly requires fetching,
+                    // but for this UI, reducing count is enough feedback.
+                    const newCount = Math.max(0, (selectedPatient.value.pendingCount || 1) - 1);
+                    const newPreview = selectedPatient.value.pendingPreview.filter(p => p.description !== currentPendencies.value.find(c => c.id === taskId)?.description);
+
+                    batch.update(doc(db, 'patients', patientId), {
+                        pendingCount: newCount,
+                        pendingPreview: newPreview
+                    });
+
+                    await batch.commit();
                 };
 
                 const dischargePatient = async (patient) => {
@@ -566,18 +649,12 @@
                     try { await navigator.clipboard.writeText(selectedPatient.value.dischargeSummary); showNotification('Copiado!', 'success'); } catch (err) { showNotification('Erro ao copiar', 'error'); }
                 };
 
-                // HELPERS & MODALS
-                const countPendingTasks = (p) => p.pendencies ? p.pendencies.filter(t => !t.done).length : 0;
-                const getPendingTasksList = (p) => p.pendencies ? p.pendencies.filter(t => !t.done).slice(0, 2) : [];
-                const hasRecentIntercurrence = (p) => p.evolutions && p.evolutions.length > 0 && p.evolutions[0].type === 'intercurrence';
                 const getCategoryColor = (cat) => ({'Neurologia':'bg-purple-100 text-purple-800','Clínica Médica':'bg-blue-100 text-blue-800','Qualquer médico':'bg-green-100 text-green-800'}[cat] || 'bg-gray-100');
                 const formatDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-';
                 const getInitials = (n) => n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
                 
                 const openModal = () => { newPatient.value = { name: '', recordNumber: '', age: '', bed: '', diagnosis: '', notes: '', admissionDate: getToday() }; showModal.value = true; };
                 const closeModal = () => showModal.value = false;
-                const openPatientDetails = (p) => { selectedPatientId.value = p.id; activeTab.value = 'timeline'; };
-                const closePatientDetails = () => selectedPatientId.value = null;
 
                 const showNotification = (m, t='success') => {
                     const id = Date.now(); notifications.value.push({id, message:m, type:t});
@@ -593,9 +670,9 @@
                     selectedPatient, openPatientDetails, closePatientDetails,
                     patients, filteredPatients, activePatients, newPatient, addPatient,
                     dischargePatient, reactivatePatient, activeTab, newEvolutionText, isIntercurrence, addEvolution,
-                    newPendency, addPendency, deletePendency, countPendingTasks, copySummary,
+                    newPendency, addPendency, deletePendency, copySummary,
                     getCategoryColor, getInitials, formatDate, savePatients: updatePatientDoc, notifications,
-                    getPendingTasksList, hasRecentIntercurrence
+                    currentEvolutions, currentPendencies
                 };
             }
         }).mount('#app');
