@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroRehab Manager 3.5 (Admissões)</title>
+    <title>NeuroRehab Manager 3.6 (Visitas)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -159,13 +159,22 @@
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div v-for="patient in filteredPatients" :key="patient.id" @click="openPatientDetails(patient)" class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md cursor-pointer transition-all flex flex-col relative group">
                             
-                            <div v-if="patient.hasActiveIntercurrence" class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md z-30 flex items-center gap-1 animate-pulse">
-                                <i class="fas fa-exclamation-triangle"></i> INTERCORRÊNCIA ATIVA
+                            <!-- BADGES DE STATUS (Intercorrência tem prioridade sobre Visita) -->
+                            <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 z-30 flex flex-col items-center gap-1 w-full">
+                                <div v-if="patient.hasActiveIntercurrence" class="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md animate-pulse whitespace-nowrap">
+                                    <i class="fas fa-exclamation-triangle"></i> INTERCORRÊNCIA
+                                </div>
+                                <!-- NOVO ALERTA DE VISITA -->
+                                <div v-else-if="isVisitOverdue(patient.lastVisit)" class="bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
+                                    <i class="fas fa-user-clock mr-1"></i> VISITA ATRASADA
+                                </div>
                             </div>
 
                             <div class="p-5 border-b border-gray-100 flex justify-between items-start">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : 'border-transparent'">{{ getInitials(patient.name) }}</div>
+                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : (isVisitOverdue(patient.lastVisit) ? 'border-orange-300 text-orange-600' : 'border-transparent')">
+                                        {{ getInitials(patient.name) }}
+                                    </div>
                                     <div class="overflow-hidden">
                                         <h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3>
                                         <div class="flex flex-col">
@@ -193,17 +202,24 @@
                                     </ul>
                                 </div>
 
-                                <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm border-t border-dashed pt-2 mt-2 flex justify-between items-center">
-                                    <span class="text-medical-600 text-xs font-bold uppercase tracking-wider">Previsão Alta</span>
-                                    <span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span>
+                                <div class="flex justify-between items-end border-t border-dashed pt-2 mt-2">
+                                    <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm">
+                                        <span class="text-medical-600 text-xs font-bold uppercase tracking-wider block">Previsão Alta</span>
+                                        <span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span>
+                                    </div>
+                                    <!-- INFO DA ÚLTIMA VISITA -->
+                                    <div class="text-right text-xs">
+                                        <span class="text-gray-400 block uppercase tracking-wider text-[10px]">Última Visita</span>
+                                        <span :class="['font-medium', isVisitOverdue(patient.lastVisit) ? 'text-orange-600 font-bold' : 'text-gray-600']">
+                                            {{ formatDate(patient.lastVisit) || 'Nunca' }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <!-- ACTIONS -->
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-end gap-2" v-if="patient.status === 'active'">
                                 <button @click.stop="dischargePatient(patient)" class="text-sm text-medical-600 hover:text-medical-800 font-medium px-3 py-1.5 rounded hover:bg-medical-50 z-10 transition-colors"><i class="fas fa-check-circle mr-1"></i> Dar Alta</button>
                             </div>
-                            <!-- BOTÃO DE NOVA INTERNAÇÃO (SUBSTITUIU READMITIR) -->
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-between items-center text-xs text-gray-500" v-else>
                                 <span>Alta em: {{ formatDate(patient.dischargeDate) }}</span>
                                 <button @click.stop="startNewAdmission(patient)" class="text-blue-600 hover:underline z-10 font-bold">
@@ -216,7 +232,7 @@
             </main>
         </div>
 
-        <!-- MODAL NOVO PACIENTE (AGORA TAMBÉM SERVE PARA READMISSÃO) -->
+        <!-- MODAL NOVO PACIENTE -->
         <div v-if="showModal" class="fixed inset-0 z-40 overflow-y-auto">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeModal"></div>
@@ -278,9 +294,21 @@
                     </div>
                     <div class="flex-grow overflow-hidden bg-gray-50 relative">
                         
-                        <!-- TIMELINE (MODIFICADA PARA RESOLUÇÃO) -->
+                        <!-- TIMELINE (MODIFICADA PARA VISITA) -->
                         <div v-if="activeTab === 'timeline'" class="absolute inset-0 flex">
                             <div class="w-full md:w-2/3 p-6 overflow-y-auto custom-scrollbar">
+                                
+                                <!-- BOTÃO DE REGISTRAR VISITA (NO TOPO) -->
+                                <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-6 flex justify-between items-center shadow-sm">
+                                    <div>
+                                        <p class="text-sm font-bold text-blue-900">Registro Diário</p>
+                                        <p class="text-xs text-blue-600">Última visita: {{ formatDate(selectedPatient.lastVisit) || 'Nenhuma registrada' }}</p>
+                                    </div>
+                                    <button @click="registerVisit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow transition-colors flex items-center">
+                                        <i class="fas fa-check-circle mr-2"></i> Confirmar Visita Hoje
+                                    </button>
+                                </div>
+
                                 <div v-if="currentEvolutions.length > 0" class="space-y-6">
                                     <div v-for="evo in currentEvolutions" :key="evo.id" class="relative pl-6 border-l-2 ml-2" :class="evo.type === 'intercurrence' ? 'border-medical-alert-500' : 'border-gray-300'">
                                         <div :class="['absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white', evo.type === 'intercurrence' ? 'bg-medical-alert-600' : 'bg-medical-500']"></div>
@@ -296,7 +324,6 @@
                                             </div>
                                             <p class="text-gray-600 text-sm whitespace-pre-line leading-relaxed">{{ evo.note }}</p>
                                             
-                                            <!-- BOTÃO DE RESOLUÇÃO (APARECE SE FOR INTERCORRÊNCIA) -->
                                             <div v-if="evo.type === 'intercurrence'" class="mt-3 pt-3 border-t border-red-100 flex justify-end">
                                                 <div v-if="evo.resolved" class="flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded border border-green-200">
                                                     <i class="fas fa-check-square mr-1"></i> Resolvida
@@ -452,7 +479,8 @@
                             dischargeSummary: doc.data().dischargeSummary || '',
                             pendingPreview: doc.data().pendingPreview || [],
                             pendingCount: doc.data().pendingCount || 0,
-                            hasActiveIntercurrence: doc.data().hasActiveIntercurrence || false
+                            hasActiveIntercurrence: doc.data().hasActiveIntercurrence || false,
+                            lastVisit: doc.data().lastVisit || null // Novo campo
                         }));
                     });
                 };
@@ -489,20 +517,48 @@
                     }
                 };
 
+                // Lógica de Registrar Visita (NOVO)
+                const registerVisit = async () => {
+                    if (!selectedPatientId.value) return;
+                    const batch = writeBatch(db);
+                    const pid = selectedPatientId.value;
+                    const now = new Date().toISOString();
+
+                    // 1. Atualiza Data no Paciente
+                    batch.update(doc(db, 'patients', pid), { lastVisit: now });
+
+                    // 2. Adiciona Log na Evolução
+                    batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
+                        date: now,
+                        note: 'Visita de rotina realizada.',
+                        author: currentUser.value.email,
+                        type: 'routine'
+                    });
+
+                    try {
+                        await batch.commit();
+                        showNotification('Visita registrada!', 'success');
+                    } catch (e) {
+                        showNotification('Erro ao registrar visita.', 'error');
+                    }
+                };
+
+                // Lógica de Alerta de Atraso (NOVO)
+                const isVisitOverdue = (lastVisit) => {
+                    if (!lastVisit) return true; // Se nunca visitou, está atrasado
+                    const last = new Date(lastVisit);
+                    const now = new Date();
+                    const diffTime = Math.abs(now - last);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    return diffDays >= 7;
+                };
+
                 const resolveIntercurrence = async (evo) => {
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
-                    
                     batch.update(doc(db, 'patients', pid), { hasActiveIntercurrence: false });
                     batch.update(doc(db, 'patients', pid, 'evolutions', evo.id), { resolved: true });
-                    
-                    try {
-                        await batch.commit();
-                        showNotification('Intercorrência resolvida!', 'success');
-                    } catch (e) {
-                        console.error(e);
-                        showNotification('Erro ao resolver.', 'error');
-                    }
+                    try { await batch.commit(); showNotification('Resolvido!', 'success'); } catch (e) { showNotification('Erro.', 'error'); }
                 };
 
                 const addPatient = async () => {
@@ -513,7 +569,8 @@
                     batch.set(newRef, {
                         ...newPatient.value, admissionDate: date, status: 'active',
                         carePlan: { goals: '', estimatedDate: '' }, dischargeSummary: '',
-                        pendingPreview: [], pendingCount: 0, hasActiveIntercurrence: false
+                        pendingPreview: [], pendingCount: 0, hasActiveIntercurrence: false,
+                        lastVisit: date // Assume visita na admissão
                     });
                     batch.set(doc(collection(db, 'patients', newRef.id, 'evolutions')), {
                         date: date, note: newPatient.value.notes || 'Admissão', author: currentUser.value.email, type: 'routine'
@@ -523,13 +580,8 @@
 
                 const startNewAdmission = (p) => {
                     newPatient.value = {
-                        name: p.name,
-                        recordNumber: p.recordNumber,
-                        age: p.age,
-                        bed: '',
-                        diagnosis: p.diagnosis,
-                        notes: 'Nova admissão (Paciente readmitido)',
-                        admissionDate: getToday()
+                        name: p.name, recordNumber: p.recordNumber, age: p.age, bed: '', diagnosis: p.diagnosis,
+                        notes: 'Nova admissão (Paciente readmitido)', admissionDate: getToday()
                     };
                     showModal.value = true;
                 };
@@ -538,23 +590,11 @@
                     if (!newEvolutionText.value.trim() || !selectedPatientId.value) return;
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
-                    
                     batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
                         date: new Date().toISOString(), note: newEvolutionText.value, author: currentUser.value.email, type: isIntercurrence.value ? 'intercurrence' : 'routine'
                     });
-                    
-                    if (isIntercurrence.value) {
-                        batch.update(doc(db, 'patients', pid), { hasActiveIntercurrence: true });
-                    }
-                    
-                    try {
-                        await batch.commit();
-                        newEvolutionText.value = ''; isIntercurrence.value = false;
-                        showNotification('Salvo!', 'success');
-                    } catch (e) {
-                        console.error(e);
-                        showNotification('Erro: ' + e.code, 'error');
-                    }
+                    if (isIntercurrence.value) batch.update(doc(db, 'patients', pid), { hasActiveIntercurrence: true });
+                    try { await batch.commit(); newEvolutionText.value = ''; isIntercurrence.value = false; showNotification('Salvo!', 'success'); } catch (e) { showNotification('Erro.', 'error'); }
                 };
 
                 const addPendency = async () => {
@@ -562,39 +602,20 @@
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
                     const pendData = { description: newPendency.value.description, category: newPendency.value.category, date: new Date().toISOString(), done: false };
-                    
                     batch.set(doc(collection(db, 'patients', pid, 'pendencies')), pendData);
-                    
                     const newPreview = [pendData, ...(selectedPatient.value.pendingPreview || [])].slice(0, 2);
-                    batch.update(doc(db, 'patients', pid), {
-                        pendingPreview: newPreview,
-                        pendingCount: (selectedPatient.value.pendingCount || 0) + 1
-                    });
-                    
-                    try {
-                        await batch.commit();
-                        newPendency.value.description = ''; showNotification('Adicionado!', 'success');
-                    } catch(e) {
-                        console.error(e);
-                        showNotification('Erro: ' + e.code, 'error');
-                    }
+                    batch.update(doc(db, 'patients', pid), { pendingPreview: newPreview, pendingCount: (selectedPatient.value.pendingCount || 0) + 1 });
+                    try { await batch.commit(); newPendency.value.description = ''; showNotification('Adicionado!', 'success'); } catch(e) { showNotification('Erro.', 'error'); }
                 };
 
                 const deletePendency = async (taskId) => {
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
                     batch.delete(doc(db, 'patients', pid, 'pendencies', taskId));
-                    
                     const newCount = Math.max(0, (selectedPatient.value.pendingCount || 1) - 1);
                     const newPreview = selectedPatient.value.pendingPreview.filter(p => p.description !== currentPendencies.value.find(c => c.id === taskId)?.description);
-                    
                     batch.update(doc(db, 'patients', pid), { pendingCount: newCount, pendingPreview: newPreview });
-                    
-                    try {
-                        await batch.commit();
-                    } catch(e) {
-                        showNotification('Erro ao deletar: ' + e.code, 'error');
-                    }
+                    try { await batch.commit(); } catch(e) { showNotification('Erro ao deletar.', 'error'); }
                 };
 
                 const dischargePatient = async (p) => { await updatePatientDoc({ id: p.id, status: 'discharged', dischargeDate: new Date().toISOString() }); showNotification("Alta registrada.", "success"); };
@@ -633,7 +654,7 @@
                     dischargePatient, startNewAdmission, activeTab, newEvolutionText, isIntercurrence, addEvolution,
                     newPendency, addPendency, deletePendency, copySummary, getCategoryColor, getInitials, formatDate,
                     savePatients: updatePatientDoc, notifications, currentEvolutions, currentPendencies, searchQuery, openPatientDetails, closePatientDetails,
-                    resolveIntercurrence
+                    resolveIntercurrence, registerVisit, isVisitOverdue
                 };
             }
         }).mount('#app');
