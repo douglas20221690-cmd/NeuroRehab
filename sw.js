@@ -1,12 +1,12 @@
-const CACHE_NAME = 'neurorehab-v3';
+const CACHE_NAME = 'neurorehab-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/vue@3/dist/vue.global.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://cdn-icons-png.flaticon.com/512/3063/3063176.png'
 ];
 
 self.addEventListener('install', (event) => {
