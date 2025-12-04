@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroRehab Manager 4.2 (Clinical Edit)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NeuroRehab Manager 4.3 (Mobile Fix)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -50,9 +50,7 @@
             #print-section, #print-section * { visibility: visible; display: block; }
             #print-section { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
             #print-section table { display: table !important; width: 100%; border-collapse: collapse; }
-            #print-section thead { display: table-header-group !important; }
-            #print-section tbody { display: table-row-group !important; }
-            #print-section tr { display: table-row !important; page-break-inside: avoid; }
+            #print-section tr { page-break-inside: avoid; }
             #print-section th, #print-section td { display: table-cell !important; border: 1px solid #ddd; padding: 8px; font-size: 12px; }
             .no-print { display: none !important; }
         }
@@ -169,7 +167,6 @@
 
                 <div class="flex-1 overflow-y-auto p-4 md:p-8">
                     
-                    <!-- Top Bar -->
                     <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
                         <div>
                             <h2 class="text-2xl font-bold text-gray-800">{{ showHistory ? 'Histórico de Pacientes' : 'Pacientes em Reabilitação' }}</h2>
@@ -279,10 +276,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ patient.bed }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{{ patient.diagnosis }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <span v-if="patient.pendingCount > 0" class="text-yellow-600 font-bold">{{ patient.pendingCount }} ativas</span>
-                                        <span v-else class="text-gray-400">-</span>
-                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span v-if="patient.pendingCount > 0" class="text-yellow-600 font-bold">{{ patient.pendingCount }} ativas</span><span v-else class="text-gray-400">-</span></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -362,7 +356,7 @@
                                  </div>
                             </div>
                         </div>
-                        <!-- PENDENCIAS -->
+                        <!-- PENDENCIAS/PLANO (CÓDIGO ANTERIOR MANTIDO) -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
@@ -424,7 +418,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC7SO3tcBRmWpcOYSIOlq2u993pwQxkLTg",
@@ -469,7 +463,6 @@
                 const windowWidth = ref(window.innerWidth);
                 const isNotePanelOpen = ref(true); 
                 
-                // Track original note state for audit
                 const originalAdmissionNote = ref(''); 
                 
                 window.addEventListener('resize', () => {
@@ -523,7 +516,7 @@
                 const openPatientDetails = (p) => {
                     selectedPatientId.value = p.id;
                     activeTab.value = 'timeline';
-                    originalAdmissionNote.value = p.admissionNote; // Store for comparison
+                    originalAdmissionNote.value = p.admissionNote; 
                     logAccess(p.id, p.name);
                     isNotePanelOpen.value = window.innerWidth >= 768; 
                     
@@ -548,7 +541,6 @@
                     } catch (e) { showNotification("Erro ao salvar.", "error"); }
                 };
 
-                // Lógica de Salvar Plano com Auditoria
                 const saveCarePlan = async () => {
                     if (!selectedPatientId.value) return;
                     
@@ -556,26 +548,24 @@
                     const pid = selectedPatientId.value;
                     const p = selectedPatient.value;
 
-                    // 1. Atualiza dados do paciente
                     batch.update(doc(db, 'patients', pid), { 
                         carePlan: p.carePlan,
-                        admissionNote: p.admissionNote // Novo valor do quadro clínico
+                        admissionNote: p.admissionNote 
                     });
 
-                    // 2. Verifica se houve alteração no quadro clínico para gerar log
                     if (p.admissionNote !== originalAdmissionNote.value) {
                         batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
                             date: new Date().toISOString(),
-                            note: '📝 Quadro clínico e comorbidades atualizado por ' + currentUser.value.email,
+                            note: '📝 Quadro clínico atualizado por ' + currentUser.value.email,
                             author: 'Sistema',
                             type: 'routine'
                         });
-                        originalAdmissionNote.value = p.admissionNote; // Update reference
+                        originalAdmissionNote.value = p.admissionNote; 
                     }
 
                     try {
                         await batch.commit();
-                        showNotification('Plano e Quadro Clínico salvos!', 'success');
+                        showNotification('Plano e Quadro salvos!', 'success');
                     } catch (e) {
                         showNotification('Erro ao salvar.', 'error');
                     }
