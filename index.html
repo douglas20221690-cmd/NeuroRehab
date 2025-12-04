@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeuroRehab Manager 4.7 (Print Fixed)</title>
+    <title>NeuroRehab Manager 4.9 (Print Table)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -44,17 +44,15 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
         [v-cloak] { display: none; }
 
-        /* --- SISTEMA DE IMPRESSÃO ROBUSTO --- */
-        
-        /* Na tela: Esconde a área de impressão */
+        /* --- ESTILOS DE IMPRESSÃO (PDF/PAPEL) --- */
         #print-section { display: none; }
 
         @media print {
-            /* Esconde elementos da interface */
+            @page { margin: 1cm; size: A4 landscape; } /* Paisagem para caber mais colunas */
+            
             body * { visibility: hidden; }
             #app > :not(#print-section) { display: none !important; }
             
-            /* Mostra apenas a área de impressão */
             #print-section, #print-section * { visibility: visible; }
             #print-section {
                 display: block !important;
@@ -63,16 +61,36 @@
                 top: 0;
                 width: 100%;
                 background: white;
-                font-family: Arial, sans-serif !important;
+                font-family: Arial, sans-serif !important; /* Fonte Arial */
             }
 
-            /* Formatação da Tabela */
-            table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-            th, td { border: 1px solid #000; padding: 5px; text-align: left; vertical-align: top; }
-            th { background-color: #eee !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+            .print-header {
+                text-align: center;
+                margin-bottom: 10px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 5px;
+            }
+
+            /* Tabela Especificação */
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                font-size: 8pt !important; /* Fonte 8 */
+            }
+            th, td { 
+                border: 1px solid #000; 
+                padding: 4px; 
+                text-align: left; 
+                vertical-align: top; 
+            }
+            th { 
+                background-color: #e0e0e0 !important; 
+                font-weight: bold; 
+                -webkit-print-color-adjust: exact; 
+            }
             tr { page-break-inside: avoid; }
-            
-            /* Remove elementos flutuantes */
+
+            /* Remove elementos desnecessários */
             .no-print, .fixed, .absolute { display: none !important; }
         }
     </style>
@@ -92,20 +110,20 @@
             </transition-group>
         </div>
 
-        <!-- ÁREA DE IMPRESSÃO (PDF) -->
+        <!-- ÁREA DE IMPRESSÃO -->
         <div id="print-section">
-            <div class="text-center mb-4 border-b pb-2">
-                <h1 class="text-xl font-bold text-black uppercase">Relatório de Pacientes - NeuroRehab</h1>
-                <p class="text-xs text-gray-600">Gerado em: {{ new Date().toLocaleString() }}</p>
+            <div class="print-header">
+                <h1 style="font-size: 14pt; font-weight: bold; text-transform: uppercase;">Relatório de Pacientes - NeuroRehab</h1>
+                <p style="font-size: 8pt;">Data de Impressão: {{ new Date().toLocaleString() }}</p>
             </div>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 20%">Dados do Paciente</th>
-                        <th style="width: 30%">Quadro Clínico</th>
+                        <th style="width: 20%">Paciente / Dados</th>
+                        <th style="width: 35%">Quadro Clínico e Comorbidades</th>
                         <th style="width: 20%">Pendências</th>
-                        <th style="width: 10%">Datas</th>
-                        <th style="width: 20%">Observações</th>
+                        <th style="width: 10%">Prev. Alta</th>
+                        <th style="width: 15%">Observações (Manual)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -116,23 +134,21 @@
                             Idade: {{ p.age }} anos<br>
                             <span v-if="p.profession">Prof: {{ p.profession }}</span>
                         </td>
-                        <td style="text-align: justify;">{{ p.admissionNote || '-' }}</td>
+                        <td style="text-align: justify;">
+                            {{ p.admissionNote || 'Não informado.' }}
+                        </td>
                         <td>
-                            <ul v-if="p.pendingPreview && p.pendingPreview.length" style="list-style-type: disc; padding-left: 15px; margin: 0;">
+                            <ul v-if="p.pendingPreview && p.pendingPreview.length" style="padding-left: 12px; margin: 0;">
                                 <li v-for="t in p.pendingPreview">{{ t.description }}</li>
                             </ul>
                             <span v-else>-</span>
                         </td>
                         <td>
-                            <div v-if="p.status === 'active'">
-                                <b>Prev. Alta:</b><br>
-                                {{ formatDate(p.carePlan?.estimatedDate) || 'S/ Previsão' }}
-                            </div>
-                            <div v-else>
-                                <b>Alta:</b><br>{{ formatDate(p.dischargeDate) }}
-                            </div>
+                            {{ formatDate(p.carePlan?.estimatedDate) || '-' }}
                         </td>
-                        <td></td>
+                        <td>
+                            <!-- Coluna vazia para escrita manual -->
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -216,8 +232,8 @@
                                 <button @click="viewMode = 'list'" :class="['px-3 py-2 text-sm', viewMode === 'list' ? 'bg-medical-100 text-medical-700' : 'bg-white text-gray-500']"><i class="fas fa-list"></i></button>
                             </div>
 
-                            <!-- Botão Imprimir -->
-                            <button @click="printList" class="text-gray-600 hover:text-medical-700 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm flex items-center" title="Exportar PDF">
+                            <!-- Botão Imprimir (RESTAURADO) -->
+                            <button @click="printList" class="text-gray-600 hover:text-medical-700 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm flex items-center" title="Imprimir Lista">
                                 <i class="fas fa-print mr-2"></i> Imprimir
                             </button>
                         </div>
@@ -225,7 +241,7 @@
 
                     <div v-if="filteredPatients.length === 0" class="text-center py-20 bg-white rounded-lg shadow-sm border border-gray-200 border-dashed">
                         <i class="fas fa-folder-open text-gray-300 text-5xl mb-4"></i>
-                        <p class="text-gray-500">Nenhum paciente encontrado.</p>
+                        <p class="text-gray-500">Nenhum paciente encontrado com os filtros atuais.</p>
                     </div>
 
                     <!-- GRID VIEW -->
@@ -541,7 +557,7 @@
                             admissionNote: doc.data().admissionNote || '', 
                             prescriptionDone: doc.data().prescriptionDone || false,
                             prescriptionDate: doc.data().prescriptionDate || null,
-                            profession: doc.data().profession || '' 
+                            profession: doc.data().profession || '' // Novo
                         }));
                     });
                 };
@@ -581,6 +597,7 @@
                     const pid = selectedPatientId.value;
                     const p = selectedPatient.value;
 
+                    // Salva dados editáveis também (Age, Profession)
                     batch.update(doc(db, 'patients', pid), { 
                         carePlan: p.carePlan,
                         admissionNote: p.admissionNote,
