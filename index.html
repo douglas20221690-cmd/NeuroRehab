@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeuroRehab Manager 4.4 (PDF & Edit)</title>
+    <title>NeuroRehab Manager 4.5 (Datas Fix)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -52,28 +52,24 @@
             #print-section { 
                 position: absolute; left: 0; top: 0; width: 100%; 
                 background: white; padding: 15px; 
-                font-family: Arial, sans-serif !important; /* Fonte Arial solicitada */
+                font-family: Arial, sans-serif !important; 
             }
             
-            /* Tabela Compacta */
             #print-section table { 
                 display: table !important; 
                 width: 100%; 
                 border-collapse: collapse; 
-                font-size: 8pt !important; /* Fonte 8 */
+                font-size: 8pt !important; 
             }
             #print-section thead { display: table-header-group !important; }
             #print-section tbody { display: table-row-group !important; }
             #print-section tr { display: table-row !important; page-break-inside: avoid; }
             #print-section th, #print-section td { 
                 display: table-cell !important; 
-                border: 1px solid #000; /* Borda preta nítida */
-                padding: 4px; /* Padding reduzido */
+                border: 1px solid #000; 
+                padding: 4px; 
             }
-            
-            /* Títulos da tabela */
             #print-section th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
-
             .no-print { display: none !important; }
         }
     </style>
@@ -106,7 +102,7 @@
                         <th class="w-[30%]">Quadro Clínico</th>
                         <th class="w-[20%]">Pendências</th>
                         <th class="w-[10%]">Datas</th>
-                        <th class="w-[20%]">Observações (Mão)</th> <!-- Coluna Nova -->
+                        <th class="w-[20%]">Observações (Mão)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -115,7 +111,7 @@
                             <div class="font-bold uppercase">{{ p.name }}</div>
                             <div>Pront: {{ p.recordNumber }}</div>
                             <div>Idade: {{ p.age }} anos</div>
-                            <div v-if="p.profession">Prof/Esc: {{ p.profession }}</div>
+                            <div v-if="p.profession">Prof: {{ p.profession }}</div>
                         </td>
                         <td class="align-top text-justify">
                             {{ p.admissionNote || '-' }}
@@ -128,13 +124,14 @@
                         </td>
                         <td class="align-top">
                             <div v-if="p.status === 'active'">
-                                <b>Adm:</b><br>{{ formatDate(p.admissionDate) }}
+                                <b>Prev. Alta:</b><br>
+                                <!-- ALTERADO: Mostra Previsão de Alta -->
+                                {{ formatDate(p.carePlan?.estimatedDate) || 'S/ Previsão' }}
                             </div>
                             <div v-else>
                                 <b>Alta:</b><br>{{ formatDate(p.dischargeDate) }}
                             </div>
                         </td>
-                        <!-- Coluna para escrever à mão -->
                         <td class="align-top"></td>
                     </tr>
                 </tbody>
@@ -242,7 +239,15 @@
                             <div class="p-5 border-b border-gray-100 flex justify-between items-start">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : (isVisitOverdue(patient.lastVisit) ? 'border-orange-300 text-orange-600' : 'border-transparent')">{{ getInitials(patient.name) }}</div>
-                                    <div class="overflow-hidden"><h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3><div class="flex flex-col"><span class="text-xs text-gray-500">{{ patient.age }} anos</span><span class="text-[10px] text-gray-400">Pront: {{ patient.recordNumber || 'N/A' }}</span></div></div>
+                                    <div class="overflow-hidden">
+                                        <h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3>
+                                        <div class="flex flex-col">
+                                            <span class="text-xs text-gray-500">{{ patient.age }} anos</span>
+                                            <!-- ALTERADO: Mostra Previsão Alta ao invés de Adm -->
+                                            <span v-if="patient.status === 'active'" class="text-[10px] text-medical-600 font-bold">Prev. Alta: {{ formatDate(patient.carePlan?.estimatedDate) || '?' }}</span>
+                                            <span v-else class="text-[10px] text-gray-400">Alta: {{ formatDate(patient.dischargeDate) }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <span :class="['px-2 py-1 text-xs rounded-full font-semibold', patient.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600']">{{ patient.status === 'active' ? 'Internado' : 'Alta' }}</span>
                             </div>
@@ -255,7 +260,7 @@
                                     <ul class="space-y-1"><li v-for="task in patient.pendingPreview" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate"><i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5 flex-shrink-0"></i><span class="truncate">{{ task.description }}</span></li></ul>
                                 </div>
                                 <div class="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                    <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm"><span class="text-medical-600 text-xs font-bold uppercase tracking-wider block">Previsão Alta</span><span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span></div>
+                                    <div class="text-xs text-gray-400">Pront: {{ patient.recordNumber }}</div>
                                     <div class="text-right text-xs"><span class="text-gray-400 block uppercase tracking-wider text-[10px]">Última Visita</span><span :class="['font-medium', isVisitOverdue(patient.lastVisit) ? 'text-orange-600 font-bold' : 'text-gray-600']">{{ formatDate(patient.lastVisit) || 'Nunca' }}</span></div>
                                 </div>
                             </div>
@@ -278,7 +283,7 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leito</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Diagnóstico</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendências</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prev. Alta</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -296,7 +301,10 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ patient.bed }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{{ patient.diagnosis }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span v-if="patient.pendingCount > 0" class="text-yellow-600 font-bold">{{ patient.pendingCount }} ativas</span><span v-else class="text-gray-400">-</span></td>
+                                    <!-- ALTERADO: Coluna de Previsão de Alta -->
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                                        {{ formatDate(patient.carePlan?.estimatedDate) || '-' }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -317,7 +325,6 @@
                             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4"><label class="block text-sm font-bold text-blue-800 mb-1">Data da Internação</label><input type="date" v-model="newPatient.admissionDate" class="block w-full rounded-md border-blue-200 py-1.5 px-3 sm:text-sm"></div>
                             <div class="grid grid-cols-3 gap-4"><div class="col-span-1"><label class="block text-sm font-medium text-gray-700">Prontuário</label><input type="text" v-model="newPatient.recordNumber" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" v-model="newPatient.name" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
                             <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-gray-700">Idade</label><input type="number" v-model="newPatient.age" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div><label class="block text-sm font-medium text-gray-700">Leito</label><input type="text" v-model="newPatient.bed" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
-                            <!-- Campo Novo -->
                             <div><label class="block text-sm font-medium text-gray-700">Profissão / Escolaridade</label><input type="text" v-model="newPatient.profession" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm" placeholder="Ex: Professor / Superior Completo"></div>
                             <div><label class="block text-sm font-medium text-gray-700">Diagnóstico</label><select v-model="newPatient.diagnosis" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"><option value="" disabled>Selecione...</option><option>AVE (Acidente Vascular Encefálico)</option><option>TCE (Traumatismo Cranioencefálico)</option><option>Lesão Medular</option><option>Doença de Parkinson</option><option>Outro</option></select></div>
                             <div><label class="block text-sm font-medium text-gray-700">Quadro clínico e Comorbidades</label><textarea v-model="newPatient.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm" placeholder="Resumo do quadro inicial..."></textarea></div>
@@ -378,7 +385,7 @@
                                  </div>
                             </div>
                         </div>
-                        <!-- PENDENCIAS (CÓDIGO ANTERIOR MANTIDO) -->
+                        <!-- PENDENCIAS/PLANO (CÓDIGO ANTERIOR MANTIDO) -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
@@ -393,13 +400,12 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- PLANO, DADOS E QUADRO CLINICO -->
+                        <!-- PLANO & QUADRO CLINICO (EDITÁVEL) -->
                         <div v-if="activeTab === 'careplan'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Dados, Quadro & Plano</h4><button @click="saveCarePlan" class="text-sm text-medical-600 hover:text-medical-800 font-medium bg-medical-50 px-3 py-1 rounded border border-medical-200 shadow-sm">Salvar Alterações</button></div>
+                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Programação & Dados Clínicos</h4><button @click="saveCarePlan" class="text-sm text-medical-600 hover:text-medical-800 font-medium bg-medical-50 px-3 py-1 rounded border border-medical-200 shadow-sm">Salvar Alterações</button></div>
                                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    
-                                    <!-- DADOS CADASTRAIS EDITÁVEIS (NOVO) -->
+                                    <!-- DADOS CADASTRAIS EDITÁVEIS -->
                                     <div class="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded border border-blue-100">
                                         <h5 class="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3">Dados Cadastrais (Editável)</h5>
                                         <div class="grid grid-cols-2 gap-4">
