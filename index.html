@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeuroRehab Manager 4.3 (Mobile Fix)</title>
+    <title>NeuroRehab Manager 4.4 (PDF & Edit)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -44,14 +44,36 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
         [v-cloak] { display: none; }
 
+        /* ESTILOS DE IMPRESSÃO (PDF OTIMIZADO) */
         @media print {
             body * { visibility: hidden; }
             #app > div:not(#print-section) { display: none !important; }
             #print-section, #print-section * { visibility: visible; display: block; }
-            #print-section { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
-            #print-section table { display: table !important; width: 100%; border-collapse: collapse; }
-            #print-section tr { page-break-inside: avoid; }
-            #print-section th, #print-section td { display: table-cell !important; border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+            #print-section { 
+                position: absolute; left: 0; top: 0; width: 100%; 
+                background: white; padding: 15px; 
+                font-family: Arial, sans-serif !important; /* Fonte Arial solicitada */
+            }
+            
+            /* Tabela Compacta */
+            #print-section table { 
+                display: table !important; 
+                width: 100%; 
+                border-collapse: collapse; 
+                font-size: 8pt !important; /* Fonte 8 */
+            }
+            #print-section thead { display: table-header-group !important; }
+            #print-section tbody { display: table-row-group !important; }
+            #print-section tr { display: table-row !important; page-break-inside: avoid; }
+            #print-section th, #print-section td { 
+                display: table-cell !important; 
+                border: 1px solid #000; /* Borda preta nítida */
+                padding: 4px; /* Padding reduzido */
+            }
+            
+            /* Títulos da tabela */
+            #print-section th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
+
             .no-print { display: none !important; }
         }
     </style>
@@ -71,51 +93,49 @@
             </transition-group>
         </div>
 
-        <!-- SEÇÃO DE IMPRESSÃO (PDF) -->
+        <!-- SEÇÃO DE IMPRESSÃO (PDF OTIMIZADO) -->
         <div id="print-section" class="hidden">
-            <div class="text-center mb-6 border-b pb-4">
-                <h1 class="text-2xl font-bold text-gray-800">Relatório de Pacientes - NeuroRehab</h1>
-                <p class="text-sm text-gray-500">Gerado em: {{ new Date().toLocaleString() }}</p>
-                <p class="text-xs text-gray-400 mt-1">Confidencial - Uso Interno Médico</p>
+            <div class="text-center mb-4 border-b pb-2">
+                <h1 class="text-xl font-bold text-black uppercase">Relatório de Pacientes - NeuroRehab</h1>
+                <p class="text-xs text-gray-600">Gerado em: {{ new Date().toLocaleString() }}</p>
             </div>
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-gray-100">
-                        <th class="py-2 font-bold text-sm">Paciente / Pront.</th>
-                        <th class="py-2 font-bold text-sm">Quadro Clínico e Comorbidades</th>
-                        <th class="py-2 font-bold text-sm">Pendências Ativas</th>
-                        <th class="py-2 font-bold text-sm">Status / Datas</th>
+                    <tr>
+                        <th class="w-[20%]">Dados do Paciente</th>
+                        <th class="w-[30%]">Quadro Clínico</th>
+                        <th class="w-[20%]">Pendências</th>
+                        <th class="w-[10%]">Datas</th>
+                        <th class="w-[20%]">Observações (Mão)</th> <!-- Coluna Nova -->
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="p in filteredPatients" :key="p.id" class="border-b border-gray-100">
-                        <td class="py-3 pr-2 align-top w-1/4">
-                            <div class="font-bold">{{ p.name }}</div>
-                            <div class="text-xs text-gray-500">Pront: {{ p.recordNumber }}</div>
-                            <div class="text-xs text-gray-500">Idade: {{ p.age }}</div>
+                    <tr v-for="p in filteredPatients" :key="p.id">
+                        <td class="align-top">
+                            <div class="font-bold uppercase">{{ p.name }}</div>
+                            <div>Pront: {{ p.recordNumber }}</div>
+                            <div>Idade: {{ p.age }} anos</div>
+                            <div v-if="p.profession">Prof/Esc: {{ p.profession }}</div>
                         </td>
-                        <td class="py-3 pr-2 align-top w-1/3 text-sm text-gray-700">
-                            {{ p.admissionNote || 'Não informado.' }}
+                        <td class="align-top text-justify">
+                            {{ p.admissionNote || '-' }}
                         </td>
-                        <td class="py-3 pr-2 align-top w-1/4">
-                            <div v-if="p.pendingCount > 0">
-                                <span class="text-xs font-bold text-red-600">{{ p.pendingCount }} Pendências</span>
-                                <ul v-if="p.pendingPreview && p.pendingPreview.length" class="list-disc list-inside text-[10px] text-gray-600 mt-1">
-                                    <li v-for="t in p.pendingPreview">{{ t.description }}</li>
-                                </ul>
-                            </div>
-                            <span v-else class="text-xs text-green-600">Nada pendente</span>
+                        <td class="align-top">
+                            <ul v-if="p.pendingPreview && p.pendingPreview.length" class="list-disc list-inside">
+                                <li v-for="t in p.pendingPreview">{{ t.description }}</li>
+                            </ul>
+                            <span v-else> - </span>
                         </td>
-                        <td class="py-3 align-top text-xs w-1/6">
+                        <td class="align-top">
                             <div v-if="p.status === 'active'">
-                                <span class="font-bold">Internado</span><br>
-                                Adm: {{ formatDate(p.admissionDate) }}
+                                <b>Adm:</b><br>{{ formatDate(p.admissionDate) }}
                             </div>
                             <div v-else>
-                                <span class="font-bold">Alta</span><br>
-                                Data: {{ formatDate(p.dischargeDate) }}
+                                <b>Alta:</b><br>{{ formatDate(p.dischargeDate) }}
                             </div>
                         </td>
+                        <!-- Coluna para escrever à mão -->
+                        <td class="align-top"></td>
                     </tr>
                 </tbody>
             </table>
@@ -297,6 +317,8 @@
                             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4"><label class="block text-sm font-bold text-blue-800 mb-1">Data da Internação</label><input type="date" v-model="newPatient.admissionDate" class="block w-full rounded-md border-blue-200 py-1.5 px-3 sm:text-sm"></div>
                             <div class="grid grid-cols-3 gap-4"><div class="col-span-1"><label class="block text-sm font-medium text-gray-700">Prontuário</label><input type="text" v-model="newPatient.recordNumber" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" v-model="newPatient.name" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
                             <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-gray-700">Idade</label><input type="number" v-model="newPatient.age" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div><label class="block text-sm font-medium text-gray-700">Leito</label><input type="text" v-model="newPatient.bed" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
+                            <!-- Campo Novo -->
+                            <div><label class="block text-sm font-medium text-gray-700">Profissão / Escolaridade</label><input type="text" v-model="newPatient.profession" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm" placeholder="Ex: Professor / Superior Completo"></div>
                             <div><label class="block text-sm font-medium text-gray-700">Diagnóstico</label><select v-model="newPatient.diagnosis" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"><option value="" disabled>Selecione...</option><option>AVE (Acidente Vascular Encefálico)</option><option>TCE (Traumatismo Cranioencefálico)</option><option>Lesão Medular</option><option>Doença de Parkinson</option><option>Outro</option></select></div>
                             <div><label class="block text-sm font-medium text-gray-700">Quadro clínico e Comorbidades</label><textarea v-model="newPatient.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm" placeholder="Resumo do quadro inicial..."></textarea></div>
                         </div>
@@ -318,7 +340,7 @@
                     <div class="bg-white border-b border-gray-200 px-6 flex items-end space-x-6 pt-2 overflow-x-auto">
                         <button @click="activeTab = 'timeline'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'timeline' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-history mr-2"></i> Evolução</button>
                         <button @click="activeTab = 'pendencies'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'pendencies' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-tasks mr-2"></i> Pendências <span v-if="currentPendencies.length > 0" class="ml-1 bg-medical-warn-600 text-white text-[10px] px-1.5 rounded-full">{{ currentPendencies.length }}</span></button>
-                        <button @click="activeTab = 'careplan'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'careplan' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-clipboard-list mr-2"></i> Plano</button>
+                        <button @click="activeTab = 'careplan'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'careplan' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-clipboard-list mr-2"></i> Dados & Plano</button>
                         <button @click="activeTab = 'summary'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'summary' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-file-medical-alt mr-2"></i> Resumo Alta</button>
                     </div>
                     <div class="flex-grow overflow-hidden bg-gray-50 relative">
@@ -356,7 +378,7 @@
                                  </div>
                             </div>
                         </div>
-                        <!-- PENDENCIAS/PLANO (CÓDIGO ANTERIOR MANTIDO) -->
+                        <!-- PENDENCIAS (CÓDIGO ANTERIOR MANTIDO) -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
@@ -371,16 +393,30 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- PLANO & QUADRO CLINICO (EDITÁVEL) -->
+                        <!-- PLANO, DADOS E QUADRO CLINICO -->
                         <div v-if="activeTab === 'careplan'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Programação & Dados Clínicos</h4><button @click="saveCarePlan" class="text-sm text-medical-600 hover:text-medical-800 font-medium bg-medical-50 px-3 py-1 rounded border border-medical-200 shadow-sm">Salvar Alterações</button></div>
+                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Dados, Quadro & Plano</h4><button @click="saveCarePlan" class="text-sm text-medical-600 hover:text-medical-800 font-medium bg-medical-50 px-3 py-1 rounded border border-medical-200 shadow-sm">Salvar Alterações</button></div>
                                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <!-- QUADRO CLÍNICO EDITÁVEL -->
+                                    
+                                    <!-- DADOS CADASTRAIS EDITÁVEIS (NOVO) -->
+                                    <div class="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded border border-blue-100">
+                                        <h5 class="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3">Dados Cadastrais (Editável)</h5>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-xs font-medium text-blue-700 mb-1">Idade</label>
+                                                <input type="number" v-model="selectedPatient.age" class="w-full border-blue-200 rounded text-sm p-1.5 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-blue-700 mb-1">Profissão / Escolaridade</label>
+                                                <input type="text" v-model="selectedPatient.profession" class="w-full border-blue-200 rounded text-sm p-1.5 focus:ring-blue-500" placeholder="Ex: Advogado">
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="col-span-1 md:col-span-2">
-                                        <label class="block text-sm font-bold text-gray-800 mb-2 border-l-4 border-medical-500 pl-2">Quadro Clínico e Comorbidades (Editável)</label>
+                                        <label class="block text-sm font-bold text-gray-800 mb-2 border-l-4 border-medical-500 pl-2">Quadro Clínico e Comorbidades</label>
                                         <textarea v-model="selectedPatient.admissionNote" rows="4" class="w-full border-gray-300 rounded-md text-sm bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-medical-500 transition-colors p-3 shadow-inner"></textarea>
-                                        <p class="text-xs text-gray-400 mt-1"><i class="fas fa-info-circle mr-1"></i> Alterações neste campo serão registradas no histórico.</p>
                                     </div>
                                     <div class="col-span-1 md:col-span-2 border-t border-gray-100 my-2"></div>
                                     <div class="col-span-1 md:col-span-2 bg-yellow-50 p-4 rounded border border-yellow-200"><label class="block text-sm font-bold text-yellow-800 mb-1">Previsão Alta</label><input type="date" v-model="selectedPatient.carePlan.estimatedDate" class="block w-full md:w-1/3 rounded-md border-yellow-300 py-1.5 px-3 sm:text-sm"></div>
@@ -461,14 +497,11 @@
                 const sortBy = ref('name'); 
                 const filterIntercurrence = ref(false);
                 const windowWidth = ref(window.innerWidth);
-                const isNotePanelOpen = ref(true); 
+                const isNotePanelOpen = ref(true); // Controle Manual
                 
                 const originalAdmissionNote = ref(''); 
                 
-                window.addEventListener('resize', () => {
-                    windowWidth.value = window.innerWidth;
-                    if(windowWidth.value < 768) isNotePanelOpen.value = false;
-                });
+                // REMOVIDO LISTENER DE RESIZE PARA CONTROLE MANUAL DO PAINEL
 
                 const currentEvolutions = ref([]);
                 const currentPendencies = ref([]);
@@ -476,7 +509,7 @@
                 let unsubscribePendencies = null;
 
                 const getToday = () => new Date().toISOString().split('T')[0];
-                const newPatient = ref({ name: '', recordNumber: '', age: '', bed: '', diagnosis: '', notes: '', admissionDate: getToday() });
+                const newPatient = ref({ name: '', recordNumber: '', age: '', bed: '', profession: '', diagnosis: '', notes: '', admissionDate: getToday() });
                 const newPendency = ref({ category: 'Clínica Médica', description: '' });
 
                 const selectedPatient = computed(() => patients.value.find(p => p.id === selectedPatientId.value) || null);
@@ -508,7 +541,8 @@
                             lastVisit: doc.data().lastVisit || null,
                             admissionNote: doc.data().admissionNote || '', 
                             prescriptionDone: doc.data().prescriptionDone || false,
-                            prescriptionDate: doc.data().prescriptionDate || null
+                            prescriptionDate: doc.data().prescriptionDate || null,
+                            profession: doc.data().profession || '' // Novo
                         }));
                     });
                 };
@@ -518,7 +552,7 @@
                     activeTab.value = 'timeline';
                     originalAdmissionNote.value = p.admissionNote; 
                     logAccess(p.id, p.name);
-                    isNotePanelOpen.value = window.innerWidth >= 768; 
+                    // MANTÉM ESTADO DO PAINEL MANUAL
                     
                     if(unsubscribeEvolutions) unsubscribeEvolutions();
                     if(unsubscribePendencies) unsubscribePendencies();
@@ -548,9 +582,12 @@
                     const pid = selectedPatientId.value;
                     const p = selectedPatient.value;
 
+                    // Salva dados editáveis também (Age, Profession)
                     batch.update(doc(db, 'patients', pid), { 
                         carePlan: p.carePlan,
-                        admissionNote: p.admissionNote 
+                        admissionNote: p.admissionNote,
+                        age: p.age,
+                        profession: p.profession
                     });
 
                     if (p.admissionNote !== originalAdmissionNote.value) {
@@ -565,7 +602,7 @@
 
                     try {
                         await batch.commit();
-                        showNotification('Plano e Quadro salvos!', 'success');
+                        showNotification('Salvo!', 'success');
                     } catch (e) {
                         showNotification('Erro ao salvar.', 'error');
                     }
@@ -618,7 +655,8 @@
                         carePlan: { goals: '', estimatedDate: '' }, dischargeSummary: '',
                         pendingPreview: [], pendingCount: 0, hasActiveIntercurrence: false,
                         lastVisit: date,
-                        admissionNote: admissionNoteText
+                        admissionNote: admissionNoteText,
+                        profession: newPatient.value.profession // Novo
                     });
                     batch.set(doc(collection(db, 'patients', newRef.id, 'evolutions')), {
                         date: date, note: admissionNoteText, author: currentUser.value.email, type: 'routine'
@@ -627,7 +665,7 @@
                 };
 
                 const startNewAdmission = (p) => {
-                    newPatient.value = { name: p.name, recordNumber: p.recordNumber, age: p.age, bed: '', diagnosis: p.diagnosis, notes: 'Nova admissão', admissionDate: getToday() };
+                    newPatient.value = { name: p.name, recordNumber: p.recordNumber, age: p.age, bed: '', diagnosis: p.diagnosis, notes: 'Nova admissão', admissionDate: getToday(), profession: p.profession };
                     showModal.value = true;
                 };
 
@@ -667,7 +705,7 @@
                 const getCategoryColor = (cat) => ({'Neurologia':'bg-purple-100 text-purple-800','Clínica Médica':'bg-blue-100 text-blue-800','Qualquer médico':'bg-green-100 text-green-800'}[cat] || 'bg-gray-100');
                 const formatDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-';
                 const getInitials = (n) => n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-                const openModal = () => { newPatient.value = { name: '', recordNumber: '', age: '', bed: '', diagnosis: '', notes: '', admissionDate: getToday() }; showModal.value = true; };
+                const openModal = () => { newPatient.value = { name: '', recordNumber: '', age: '', bed: '', diagnosis: '', notes: '', admissionDate: getToday(), profession: '' }; showModal.value = true; };
                 const closeModal = () => showModal.value = false;
                 const showNotification = (m, t='success') => { const id = Date.now(); notifications.value.push({id, message:m, type:t}); setTimeout(() => notifications.value = notifications.value.filter(n=>n.id!==id), 3000); };
 
