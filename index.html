@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroRehab Manager 3.8 (PWA PNG)</title>
+    <title>NeuroRehab Manager 4.2 (Clinical Edit)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0284c7">
-    
-    <!-- Ícone PNG (Correção de Distorção) -->
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3063/3063176.png">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3063/3063176.png">
 
@@ -40,15 +38,24 @@
     <style>
         .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
         .fade-enter-from, .fade-leave-to { opacity: 0; }
-        .slide-fade-enter-active { transition: all 0.3s ease-out; }
-        .slide-fade-leave-active { transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1); }
-        .slide-fade-enter-from, .slide-fade-leave-to { transform: translateX(20px); opacity: 0; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
         [v-cloak] { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #app > div:not(#print-section) { display: none !important; }
+            #print-section, #print-section * { visibility: visible; display: block; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
+            #print-section table { display: table !important; width: 100%; border-collapse: collapse; }
+            #print-section thead { display: table-header-group !important; }
+            #print-section tbody { display: table-row-group !important; }
+            #print-section tr { display: table-row !important; page-break-inside: avoid; }
+            #print-section th, #print-section td { display: table-cell !important; border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 h-screen overflow-hidden">
@@ -56,8 +63,8 @@
     <div id="app" class="h-full flex flex-col" v-cloak>
 
         <!-- Notificações -->
-        <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-            <transition-group name="slide-fade">
+        <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none no-print">
+            <transition-group name="fade">
                 <div v-for="notif in notifications" :key="notif.id" 
                      :class="['px-4 py-3 rounded shadow-lg text-white flex items-center min-w-[250px] pointer-events-auto', notif.type === 'error' ? 'bg-red-500' : 'bg-green-600']">
                     <i :class="['fas mr-2', notif.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle']"></i>
@@ -66,56 +73,82 @@
             </transition-group>
         </div>
 
-        <!-- LOADING INICIAL -->
-        <div v-if="isLoading" class="fixed inset-0 bg-medical-900 flex flex-col items-center justify-center z-[100] text-white">
-            <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
-            <p>Conectando ao sistema...</p>
+        <!-- SEÇÃO DE IMPRESSÃO (PDF) -->
+        <div id="print-section" class="hidden">
+            <div class="text-center mb-6 border-b pb-4">
+                <h1 class="text-2xl font-bold text-gray-800">Relatório de Pacientes - NeuroRehab</h1>
+                <p class="text-sm text-gray-500">Gerado em: {{ new Date().toLocaleString() }}</p>
+                <p class="text-xs text-gray-400 mt-1">Confidencial - Uso Interno Médico</p>
+            </div>
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="py-2 font-bold text-sm">Paciente / Pront.</th>
+                        <th class="py-2 font-bold text-sm">Quadro Clínico e Comorbidades</th>
+                        <th class="py-2 font-bold text-sm">Pendências Ativas</th>
+                        <th class="py-2 font-bold text-sm">Status / Datas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="p in filteredPatients" :key="p.id" class="border-b border-gray-100">
+                        <td class="py-3 pr-2 align-top w-1/4">
+                            <div class="font-bold">{{ p.name }}</div>
+                            <div class="text-xs text-gray-500">Pront: {{ p.recordNumber }}</div>
+                            <div class="text-xs text-gray-500">Idade: {{ p.age }}</div>
+                        </td>
+                        <td class="py-3 pr-2 align-top w-1/3 text-sm text-gray-700">
+                            {{ p.admissionNote || 'Não informado.' }}
+                        </td>
+                        <td class="py-3 pr-2 align-top w-1/4">
+                            <div v-if="p.pendingCount > 0">
+                                <span class="text-xs font-bold text-red-600">{{ p.pendingCount }} Pendências</span>
+                                <ul v-if="p.pendingPreview && p.pendingPreview.length" class="list-disc list-inside text-[10px] text-gray-600 mt-1">
+                                    <li v-for="t in p.pendingPreview">{{ t.description }}</li>
+                                </ul>
+                            </div>
+                            <span v-else class="text-xs text-green-600">Nada pendente</span>
+                        </td>
+                        <td class="py-3 align-top text-xs w-1/6">
+                            <div v-if="p.status === 'active'">
+                                <span class="font-bold">Internado</span><br>
+                                Adm: {{ formatDate(p.admissionDate) }}
+                            </div>
+                            <div v-else>
+                                <span class="font-bold">Alta</span><br>
+                                Data: {{ formatDate(p.dischargeDate) }}
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <!-- TELA DE LOGIN -->
-        <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4">
+        <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4 no-print">
             <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
                 <div class="text-center mb-8">
-                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-medical-100 mb-4 text-medical-600">
-                        <i class="fas fa-brain text-4xl"></i>
-                    </div>
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-medical-100 mb-4 text-medical-600"><i class="fas fa-brain text-4xl"></i></div>
                     <h1 class="text-2xl font-bold text-gray-800">NeuroRehab Manager</h1>
                     <p class="text-gray-500 text-sm mt-1">Acesso Restrito à Equipe Clínica</p>
                 </div>
-                
                 <form @submit.prevent="handleLogin" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Profissional</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-envelope"></i></span>
-                            <input v-model="loginForm.email" type="email" required class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm" placeholder="nome@hospital.com">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-lock"></i></span>
-                            <input v-model="loginForm.password" type="password" required class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2.5 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm" placeholder="••••••••">
-                        </div>
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label><input v-model="loginForm.email" type="email" required class="block w-full rounded-md border-gray-300 p-2.5 border focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Senha</label><input v-model="loginForm.password" type="password" required class="block w-full rounded-md border-gray-300 p-2.5 border focus:ring-2 focus:ring-medical-500 outline-none shadow-sm"></div>
                     <button type="submit" :disabled="isLoggingIn" class="w-full flex justify-center py-2.5 px-4 rounded-md text-white bg-medical-600 hover:bg-medical-700 disabled:opacity-50 transition-colors shadow-sm font-medium">
                         <i v-if="isLoggingIn" class="fas fa-circle-notch fa-spin mr-2 mt-1"></i>
-                        {{ isLoggingIn ? 'Verificando credenciais...' : 'Acessar Sistema' }}
+                        {{ isLoggingIn ? 'Verificando...' : 'Acessar' }}
                     </button>
-                    <div class="text-center text-xs text-gray-400 mt-4 border-t pt-4">
-                        <p><i class="fas fa-info-circle mr-1"></i> Acesso controlado pelo administrador.</p>
-                    </div>
                 </form>
             </div>
         </div>
 
         <!-- DASHBOARD -->
-        <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100">
+        <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100 no-print">
+            
             <!-- Sidebar -->
             <aside class="w-64 bg-white shadow-md flex-col hidden md:flex z-10">
                 <div class="p-6 border-b border-gray-200 flex items-center gap-3">
-                    <i class="fas fa-brain text-medical-600 text-2xl"></i>
-                    <span class="font-bold text-gray-800">NeuroRehab</span>
+                    <i class="fas fa-brain text-medical-600 text-2xl"></i><span class="font-bold text-gray-800">NeuroRehab</span>
                 </div>
                 <nav class="flex-grow p-4 space-y-2">
                     <a href="#" class="flex items-center px-4 py-3 bg-medical-50 text-medical-700 rounded-lg font-medium"><i class="fas fa-user-injured w-6"></i> Pacientes</a>
@@ -127,67 +160,72 @@
                 </div>
             </aside>
 
-            <!-- Conteúdo Principal -->
+            <!-- Main Content -->
             <main class="flex-1 overflow-hidden flex flex-col">
                 <header class="bg-white shadow-sm p-4 flex justify-between items-center md:hidden">
-                    <span class="font-bold text-gray-800 flex items-center">
-                        <i class="fas fa-brain text-medical-600 mr-2"></i>
-                        NeuroRehab
-                    </span>
+                    <span class="font-bold text-gray-800 flex items-center"><i class="fas fa-brain text-medical-600 mr-2"></i> NeuroRehab</span>
                     <button @click="logout" class="text-gray-500"><i class="fas fa-sign-out-alt"></i></button>
                 </header>
 
                 <div class="flex-1 overflow-y-auto p-4 md:p-8">
                     
-                    <!-- Header da Página -->
+                    <!-- Top Bar -->
                     <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
                         <div>
                             <h2 class="text-2xl font-bold text-gray-800">{{ showHistory ? 'Histórico de Pacientes' : 'Pacientes em Reabilitação' }}</h2>
                             <p class="text-gray-500 text-sm">{{ activePatients.length }} pacientes internados</p>
                         </div>
-                        <button v-if="!showHistory" @click="openModal" class="bg-medical-600 hover:bg-medical-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center transition-colors whitespace-nowrap self-start md:self-auto"><i class="fas fa-plus mr-2"></i> Novo Paciente</button>
+                        <button v-if="!showHistory" @click="openModal" class="bg-medical-600 hover:bg-medical-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center"><i class="fas fa-plus mr-2"></i> Novo Paciente</button>
                     </div>
 
-                    <!-- BUSCA -->
-                    <div class="relative mb-8 max-w-xl">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
-                        <input v-model="searchQuery" type="text" class="pl-10 block w-full rounded-lg border-gray-300 bg-white border p-3 focus:ring-2 focus:ring-medical-500 outline-none shadow-sm" placeholder="Pesquisar por nome ou prontuário...">
-                        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"><i class="fas fa-times-circle"></i></button>
+                    <!-- Ferramentas -->
+                    <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+                        <div class="relative w-full md:w-1/3">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
+                            <input v-model="searchQuery" type="text" class="pl-10 block w-full rounded-md border-gray-300 bg-gray-50 border p-2 text-sm focus:ring-medical-500 outline-none" placeholder="Nome ou prontuário...">
+                        </div>
+
+                        <div class="flex flex-wrap gap-3 items-center w-full md:w-auto justify-end">
+                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer bg-gray-50 px-3 py-2 rounded border border-gray-200 hover:bg-gray-100 select-none">
+                                <input type="checkbox" v-model="filterIntercurrence" class="rounded text-medical-600">
+                                <span class="text-xs font-bold text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i> Intercorrências</span>
+                            </label>
+
+                            <select v-model="sortBy" class="text-sm border-gray-300 border rounded-md p-2 bg-gray-50 outline-none">
+                                <option value="name">Nome (A-Z)</option>
+                                <option value="dateDesc">Data (Recente)</option>
+                                <option value="dateAsc">Data (Antiga)</option>
+                            </select>
+
+                            <div class="flex border border-gray-300 rounded-md overflow-hidden">
+                                <button @click="viewMode = 'grid'" :class="['px-3 py-2 text-sm', viewMode === 'grid' ? 'bg-medical-100 text-medical-700' : 'bg-white text-gray-500']"><i class="fas fa-th-large"></i></button>
+                                <button @click="viewMode = 'list'" :class="['px-3 py-2 text-sm', viewMode === 'list' ? 'bg-medical-100 text-medical-700' : 'bg-white text-gray-500']"><i class="fas fa-list"></i></button>
+                            </div>
+
+                            <button @click="printList" class="text-gray-600 hover:text-medical-700 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm" title="Exportar PDF">
+                                <i class="fas fa-print"></i>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Lista Vazia -->
                     <div v-if="filteredPatients.length === 0" class="text-center py-20 bg-white rounded-lg shadow-sm border border-gray-200 border-dashed">
                         <i class="fas fa-folder-open text-gray-300 text-5xl mb-4"></i>
-                        <p class="text-gray-500 text-lg" v-if="searchQuery">Nada encontrado para "<span class="font-bold">{{searchQuery}}</span>".</p>
-                        <p class="text-gray-500 text-lg" v-else>Nenhum paciente na lista.</p>
+                        <p class="text-gray-500">Nenhum paciente encontrado com os filtros atuais.</p>
                     </div>
 
-                    <!-- Grid -->
-                    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- GRID VIEW -->
+                    <div v-if="viewMode === 'grid' && filteredPatients.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div v-for="patient in filteredPatients" :key="patient.id" @click="openPatientDetails(patient)" class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md cursor-pointer transition-all flex flex-col relative group">
                             
-                            <!-- BADGES -->
                             <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 z-30 flex flex-col items-center gap-1 w-full">
-                                <div v-if="patient.hasActiveIntercurrence" class="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md animate-pulse whitespace-nowrap">
-                                    <i class="fas fa-exclamation-triangle"></i> INTERCORRÊNCIA
-                                </div>
-                                <div v-else-if="isVisitOverdue(patient.lastVisit)" class="bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
-                                    <i class="fas fa-user-clock mr-1"></i> VISITA ATRASADA
-                                </div>
+                                <div v-if="patient.hasActiveIntercurrence" class="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md animate-pulse whitespace-nowrap"><i class="fas fa-exclamation-triangle"></i> INTERCORRÊNCIA</div>
+                                <div v-else-if="isVisitOverdue(patient.lastVisit)" class="bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap"><i class="fas fa-user-clock mr-1"></i> VISITA ATRASADA</div>
                             </div>
 
                             <div class="p-5 border-b border-gray-100 flex justify-between items-start">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : (isVisitOverdue(patient.lastVisit) ? 'border-orange-300 text-orange-600' : 'border-transparent')">
-                                        {{ getInitials(patient.name) }}
-                                    </div>
-                                    <div class="overflow-hidden">
-                                        <h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3>
-                                        <div class="flex flex-col">
-                                            <span class="text-xs text-gray-500">{{ patient.age }} anos</span>
-                                            <span class="text-[10px] text-gray-400">Pront: {{ patient.recordNumber || 'N/A' }}</span>
-                                        </div>
-                                    </div>
+                                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : (isVisitOverdue(patient.lastVisit) ? 'border-orange-300 text-orange-600' : 'border-transparent')">{{ getInitials(patient.name) }}</div>
+                                    <div class="overflow-hidden"><h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3><div class="flex flex-col"><span class="text-xs text-gray-500">{{ patient.age }} anos</span><span class="text-[10px] text-gray-400">Pront: {{ patient.recordNumber || 'N/A' }}</span></div></div>
                                 </div>
                                 <span :class="['px-2 py-1 text-xs rounded-full font-semibold', patient.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600']">{{ patient.status === 'active' ? 'Internado' : 'Alta' }}</span>
                             </div>
@@ -195,187 +233,128 @@
                             <div class="p-5 flex-grow space-y-3">
                                 <div class="text-sm"><span class="text-gray-400 block text-xs uppercase tracking-wider">Diagnóstico</span><span class="font-medium text-gray-700">{{ patient.diagnosis }}</span></div>
                                 <div class="text-sm"><span class="text-gray-400 block text-xs uppercase tracking-wider">Leito</span><span class="text-gray-600">{{ patient.bed }}</span></div>
-                                
                                 <div v-if="patient.pendingCount > 0" class="mt-2 bg-yellow-50 rounded-md border border-yellow-100 p-2.5">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="text-xs font-bold text-yellow-800 flex items-center"><i class="fas fa-tasks mr-1"></i> Pendências</span>
-                                        <span class="bg-yellow-200 text-yellow-800 text-[10px] px-1.5 rounded-full font-bold">{{ patient.pendingCount }}</span>
-                                    </div>
-                                    <ul class="space-y-1">
-                                        <li v-for="task in patient.pendingPreview" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate">
-                                            <i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5 flex-shrink-0"></i><span class="truncate">{{ task.description }}</span>
-                                        </li>
-                                    </ul>
+                                    <div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-yellow-800 flex items-center"><i class="fas fa-tasks mr-1"></i> Pendências</span><span class="bg-yellow-200 text-yellow-800 text-[10px] px-1.5 rounded-full font-bold">{{ patient.pendingCount }}</span></div>
+                                    <ul class="space-y-1"><li v-for="task in patient.pendingPreview" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate"><i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5 flex-shrink-0"></i><span class="truncate">{{ task.description }}</span></li></ul>
                                 </div>
-
                                 <div class="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                    <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm">
-                                        <span class="text-medical-600 text-xs font-bold uppercase tracking-wider block">Previsão Alta</span>
-                                        <span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span>
-                                    </div>
-                                    <div class="text-right text-xs">
-                                        <span class="text-gray-400 block uppercase tracking-wider text-[10px]">Última Visita</span>
-                                        <span :class="['font-medium', isVisitOverdue(patient.lastVisit) ? 'text-orange-600 font-bold' : 'text-gray-600']">
-                                            {{ formatDate(patient.lastVisit) || 'Nunca' }}
-                                        </span>
-                                    </div>
+                                    <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm"><span class="text-medical-600 text-xs font-bold uppercase tracking-wider block">Previsão Alta</span><span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span></div>
+                                    <div class="text-right text-xs"><span class="text-gray-400 block uppercase tracking-wider text-[10px]">Última Visita</span><span :class="['font-medium', isVisitOverdue(patient.lastVisit) ? 'text-orange-600 font-bold' : 'text-gray-600']">{{ formatDate(patient.lastVisit) || 'Nunca' }}</span></div>
                                 </div>
                             </div>
-                            
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-end gap-2" v-if="patient.status === 'active'">
-                                <button @click.stop="dischargePatient(patient)" class="text-sm text-medical-600 hover:text-medical-800 font-medium px-3 py-1.5 rounded hover:bg-medical-50 z-10 transition-colors"><i class="fas fa-check-circle mr-1"></i> Dar Alta</button>
+                                <button @click.stop="dischargePatient(patient)" class="text-sm text-medical-600 hover:text-medical-800 font-medium px-3 py-1.5 rounded hover:bg-medical-50 z-10"><i class="fas fa-check-circle mr-1"></i> Dar Alta</button>
                             </div>
                             <div class="p-4 bg-gray-50 rounded-b-xl border-t border-gray-100 flex justify-between items-center text-xs text-gray-500" v-else>
-                                <span>Alta em: {{ formatDate(patient.dischargeDate) }}</span>
-                                <button @click.stop="startNewAdmission(patient)" class="text-blue-600 hover:underline z-10 font-bold">
-                                    <i class="fas fa-file-medical mr-1"></i> Nova Internação
-                                </button>
+                                <span>Alta: {{ formatDate(patient.dischargeDate) }}</span>
+                                <button @click.stop="startNewAdmission(patient)" class="text-blue-600 hover:underline z-10 font-bold"><i class="fas fa-file-medical mr-1"></i> Nova Internação</button>
                             </div>
                         </div>
                     </div>
+
+                    <!-- LIST VIEW -->
+                    <div v-else-if="viewMode === 'list' && filteredPatients.length > 0" class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paciente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leito</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Diagnóstico</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendências</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="patient in filteredPatients" :key="patient.id" @click="openPatientDetails(patient)" class="hover:bg-gray-50 cursor-pointer">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-medical-100 flex items-center justify-center text-medical-600 font-bold text-xs">{{ getInitials(patient.name) }}</div>
+                                            <div class="ml-4"><div class="text-sm font-medium text-gray-900">{{ patient.name }}</div><div class="text-xs text-gray-500">Pront: {{ patient.recordNumber }}</div></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span v-if="patient.hasActiveIntercurrence" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Intercorrência</span>
+                                        <span v-else-if="isVisitOverdue(patient.lastVisit)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Visita Atrasada</span>
+                                        <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Estável</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ patient.bed }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{{ patient.diagnosis }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span v-if="patient.pendingCount > 0" class="text-yellow-600 font-bold">{{ patient.pendingCount }} ativas</span>
+                                        <span v-else class="text-gray-400">-</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
                 </div>
             </main>
         </div>
 
         <!-- MODAL NOVO PACIENTE -->
-        <div v-if="showModal" class="fixed inset-0 z-40 overflow-y-auto">
+        <div v-if="showModal" class="fixed inset-0 z-40 overflow-y-auto no-print">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeModal"></div>
                 <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full relative z-50">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <h3 class="text-lg font-medium text-gray-900 mb-4">Adicionar Paciente / Nova Internação</h3>
                         <div class="space-y-4">
-                            <div class="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4">
-                                <label class="block text-sm font-bold text-blue-800 mb-1">Data da Internação</label>
-                                <input type="date" v-model="newPatient.admissionDate" class="block w-full rounded-md border-blue-200 py-1.5 px-3 sm:text-sm">
-                            </div>
-                            <div class="grid grid-cols-3 gap-4">
-                                <div class="col-span-1"><label class="block text-sm font-medium text-gray-700">Prontuário</label><input type="text" v-model="newPatient.recordNumber" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div>
-                                <div class="col-span-2"><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" v-model="newPatient.name" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div><label class="block text-sm font-medium text-gray-700">Idade</label><input type="number" v-model="newPatient.age" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div>
-                                <div><label class="block text-sm font-medium text-gray-700">Leito</label><input type="text" v-model="newPatient.bed" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Diagnóstico</label>
-                                <select v-model="newPatient.diagnosis" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm">
-                                    <option value="" disabled>Selecione...</option>
-                                    <option>AVE (Acidente Vascular Encefálico)</option>
-                                    <option>TCE (Traumatismo Cranioencefálico)</option>
-                                    <option>Lesão Medular</option>
-                                    <option>Doença de Parkinson</option>
-                                    <option>Outro</option>
-                                </select>
-                            </div>
-                            <div><label class="block text-sm font-medium text-gray-700">Nota de Admissão</label><textarea v-model="newPatient.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></textarea></div>
+                            <div class="bg-blue-50 p-3 rounded-md border border-blue-100 mb-4"><label class="block text-sm font-bold text-blue-800 mb-1">Data da Internação</label><input type="date" v-model="newPatient.admissionDate" class="block w-full rounded-md border-blue-200 py-1.5 px-3 sm:text-sm"></div>
+                            <div class="grid grid-cols-3 gap-4"><div class="col-span-1"><label class="block text-sm font-medium text-gray-700">Prontuário</label><input type="text" v-model="newPatient.recordNumber" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" v-model="newPatient.name" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
+                            <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-gray-700">Idade</label><input type="number" v-model="newPatient.age" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div><div><label class="block text-sm font-medium text-gray-700">Leito</label><input type="text" v-model="newPatient.bed" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"></div></div>
+                            <div><label class="block text-sm font-medium text-gray-700">Diagnóstico</label><select v-model="newPatient.diagnosis" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm"><option value="" disabled>Selecione...</option><option>AVE (Acidente Vascular Encefálico)</option><option>TCE (Traumatismo Cranioencefálico)</option><option>Lesão Medular</option><option>Doença de Parkinson</option><option>Outro</option></select></div>
+                            <div><label class="block text-sm font-medium text-gray-700">Quadro clínico e Comorbidades</label><textarea v-model="newPatient.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 sm:text-sm" placeholder="Resumo do quadro inicial..."></textarea></div>
                         </div>
                     </div>
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button type="button" @click="addPatient" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-medical-600 text-base font-medium text-white hover:bg-medical-700 sm:ml-3 sm:w-auto sm:text-sm">Confirmar Internação</button>
-                        <button type="button" @click="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
-                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse"><button type="button" @click="addPatient" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-medical-600 text-base font-medium text-white hover:bg-medical-700 sm:ml-3 sm:w-auto sm:text-sm">Confirmar</button><button type="button" @click="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button></div>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL DETALHES (PRONTUÁRIO) -->
-        <div v-if="selectedPatient" class="fixed inset-0 z-50 overflow-y-auto">
+        <!-- MODAL DETALHES -->
+        <div v-if="selectedPatient" class="fixed inset-0 z-50 overflow-y-auto no-print">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
                 <div class="fixed inset-0 bg-gray-900 bg-opacity-80 transition-opacity" @click="closePatientDetails"></div>
-                
                 <div class="relative z-10 bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-5xl w-full h-[90vh] flex flex-col">
-                    <!-- HEADER DO MODAL -->
                     <div class="bg-medical-600 px-6 py-4 flex justify-between items-start text-white flex-shrink-0">
-                        <div>
-                            <div class="flex items-center gap-3"><h3 class="text-xl font-bold">{{ selectedPatient.name }}</h3><span class="bg-white/20 px-2 py-0.5 rounded text-sm">Pront: {{ selectedPatient.recordNumber || 'N/A' }}</span></div>
-                            <div class="mt-1 text-medical-100 text-sm flex gap-4"><span><i class="fas fa-calendar-alt mr-1"></i> {{ selectedPatient.age }} anos</span><span><i class="fas fa-bed mr-1"></i> {{ selectedPatient.bed }}</span><span><i class="fas fa-notes-medical mr-1"></i> {{ selectedPatient.diagnosis }}</span></div>
-                        </div>
+                        <div><div class="flex items-center gap-3"><h3 class="text-xl font-bold">{{ selectedPatient.name }}</h3><span class="bg-white/20 px-2 py-0.5 rounded text-sm">Pront: {{ selectedPatient.recordNumber || 'N/A' }}</span></div><div class="mt-1 text-medical-100 text-sm flex gap-4"><span><i class="fas fa-calendar-alt mr-1"></i> {{ selectedPatient.age }} anos</span><span><i class="fas fa-bed mr-1"></i> {{ selectedPatient.bed }}</span><span><i class="fas fa-notes-medical mr-1"></i> {{ selectedPatient.diagnosis }}</span></div></div>
                         <button @click="closePatientDetails" class="text-white hover:text-gray-200"><i class="fas fa-times text-xl"></i></button>
                     </div>
-
-                    <!-- ABAS DE NAVEGAÇÃO -->
                     <div class="bg-white border-b border-gray-200 px-6 flex items-end space-x-6 pt-2 overflow-x-auto">
                         <button @click="activeTab = 'timeline'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'timeline' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-history mr-2"></i> Evolução</button>
                         <button @click="activeTab = 'pendencies'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'pendencies' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-tasks mr-2"></i> Pendências <span v-if="currentPendencies.length > 0" class="ml-1 bg-medical-warn-600 text-white text-[10px] px-1.5 rounded-full">{{ currentPendencies.length }}</span></button>
                         <button @click="activeTab = 'careplan'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'careplan' ? 'border-medical-600 text-medical-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-clipboard-list mr-2"></i> Plano</button>
                         <button @click="activeTab = 'summary'" :class="['pb-3 px-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap', activeTab === 'summary' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700']"><i class="fas fa-file-medical-alt mr-2"></i> Resumo Alta</button>
                     </div>
-
-                    <!-- CONTEÚDO DO MODAL -->
                     <div class="flex-grow overflow-hidden bg-gray-50 relative">
-                        
-                        <!-- ABA TIMELINE COM PAINEL COLAPSÁVEL -->
+                        <!-- TIMELINE -->
                         <div v-if="activeTab === 'timeline'" class="absolute inset-0 flex flex-col md:flex-row overflow-hidden">
-                            
-                            <!-- 1. COLUNA TIMELINE (ESQUERDA/TOPO) -->
-                            <div class="flex-grow p-6 overflow-y-auto custom-scrollbar bg-gray-50 transition-all"
-                                 :class="{'md:w-full': !isNotePanelOpen, 'md:w-2/3': isNotePanelOpen}">
-                                
-                                <!-- BOTÃO REGISTRAR VISITA -->
+                            <div class="flex-grow p-6 overflow-y-auto custom-scrollbar bg-gray-50 transition-all" :class="{'md:w-full': !isNotePanelOpen, 'md:w-2/3': isNotePanelOpen}">
                                 <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-6 flex justify-between items-center shadow-sm">
-                                    <div>
-                                        <p class="text-sm font-bold text-blue-900">Registro Diário</p>
-                                        <p class="text-xs text-blue-600">Última: {{ formatDate(selectedPatient.lastVisit) || '-' }}</p>
-                                    </div>
-                                    <button @click="registerVisit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow transition-colors flex items-center">
-                                        <i class="fas fa-check-circle mr-2"></i> Visita Hoje
-                                    </button>
+                                    <div><p class="text-sm font-bold text-blue-900">Registro Diário</p><p class="text-xs text-blue-600">Última: {{ formatDate(selectedPatient.lastVisit) || '-' }}</p></div>
+                                    <button @click="registerVisit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow transition-colors flex items-center"><i class="fas fa-check-circle mr-2"></i> Visita Hoje</button>
                                 </div>
-
                                 <div v-if="currentEvolutions.length > 0" class="space-y-6 pb-20 md:pb-0">
                                     <div v-for="evo in currentEvolutions" :key="evo.id" class="relative pl-6 border-l-2 ml-2" :class="evo.type === 'intercurrence' ? 'border-medical-alert-500' : 'border-gray-300'">
                                         <div :class="['absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white', evo.type === 'intercurrence' ? 'bg-medical-alert-600' : 'bg-medical-500']"></div>
                                         <div :class="['p-4 rounded-lg shadow-sm border', evo.type === 'intercurrence' ? 'bg-medical-alert-50 border-medical-alert-100' : 'bg-white border-gray-100']">
-                                            <div class="flex justify-between items-center mb-2">
-                                                <div class="flex items-center gap-2"><span :class="['text-xs font-bold px-2 py-0.5 rounded', evo.type === 'intercurrence' ? 'bg-red-100 text-red-800' : 'bg-blue-50 text-blue-800']">{{ evo.type === 'intercurrence' ? 'INTERCORRÊNCIA' : 'Evolução' }}</span><span class="text-sm font-bold text-gray-700">{{ new Date(evo.date).toLocaleString('pt-BR') }}</span></div>
-                                                <span class="text-xs text-gray-400 border border-gray-200 px-2 py-1 rounded">{{ evo.author }}</span>
-                                            </div>
+                                            <div class="flex justify-between items-center mb-2"><div class="flex items-center gap-2"><span :class="['text-xs font-bold px-2 py-0.5 rounded', evo.type === 'intercurrence' ? 'bg-red-100 text-red-800' : 'bg-blue-50 text-blue-800']">{{ evo.type === 'intercurrence' ? 'INTERCORRÊNCIA' : 'Evolução' }}</span><span class="text-sm font-bold text-gray-700">{{ new Date(evo.date).toLocaleString('pt-BR') }}</span></div><span class="text-xs text-gray-400 border border-gray-200 px-2 py-1 rounded">{{ evo.author }}</span></div>
                                             <p class="text-gray-600 text-sm whitespace-pre-line leading-relaxed">{{ evo.note }}</p>
-                                            
                                             <div v-if="evo.type === 'intercurrence'" class="mt-3 pt-3 border-t border-red-100 flex justify-end">
-                                                <div v-if="evo.resolved" class="flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded border border-green-200">
-                                                    <i class="fas fa-check-square mr-1"></i> Resolvida
-                                                </div>
-                                                <button v-else @click="resolveIntercurrence(evo)" class="flex items-center text-xs text-gray-600 bg-white border border-gray-300 hover:border-green-500 hover:text-green-600 px-3 py-1.5 rounded transition-all shadow-sm">
-                                                    <i class="far fa-square mr-2"></i> Resolver
-                                                </button>
+                                                <div v-if="evo.resolved" class="flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded border border-green-200"><i class="fas fa-check-square mr-1"></i> Resolvida</div>
+                                                <button v-else @click="resolveIntercurrence(evo)" class="flex items-center text-xs text-gray-600 bg-white border border-gray-300 hover:border-green-500 hover:text-green-600 px-3 py-1.5 rounded transition-all shadow-sm"><i class="far fa-square mr-2"></i> Resolver</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div v-else class="text-center text-gray-500 py-10">Histórico vazio ou carregando...</div>
+                                <div v-else class="text-center text-gray-500 py-10">Sem histórico.</div>
                             </div>
-
-                            <!-- 2. PAINEL NOVA NOTA (DIREITA/EMBAIXO COLAPSÁVEL) -->
-                            <div class="bg-white border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none z-20 flex flex-col transition-all duration-300 ease-in-out"
-                                 :class="[
-                                    isNotePanelOpen ? 'h-[450px] md:h-full md:w-1/3' : 'h-14 md:h-full md:w-12',
-                                    'border-t md:border-t-0 md:border-l'
-                                 ]">
-                                 
-                                 <!-- Header / Toggle -->
-                                 <div class="p-3 border-b border-gray-100 flex justify-between items-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors h-14 flex-shrink-0"
-                                      @click="isNotePanelOpen = !isNotePanelOpen"
-                                      title="Clique para expandir/recolher">
-                                      
-                                      <!-- Desktop Collapsed View -->
-                                      <div v-if="!isNotePanelOpen && windowWidth >= 768" class="hidden md:flex h-full w-full items-center justify-center">
-                                          <i class="fas fa-pen-fancy text-medical-600"></i>
-                                      </div>
-
-                                      <!-- Normal View -->
-                                      <div v-else class="flex items-center gap-2 w-full justify-between">
-                                          <h4 class="text-sm font-bold text-gray-800 uppercase tracking-wider text-medical-600 flex items-center">
-                                              <i class="fas fa-pen-fancy mr-2"></i> 
-                                              <span v-if="isNotePanelOpen">Nova Nota</span>
-                                          </h4>
-                                          <i class="fas text-gray-400" 
-                                             :class="isNotePanelOpen ? 'fa-chevron-down md:fa-chevron-right' : 'fa-chevron-up md:fa-chevron-left'"></i>
-                                      </div>
+                            <div class="bg-white border-gray-200 shadow z-20 flex flex-col transition-all duration-300 ease-in-out" :class="[isNotePanelOpen ? 'h-[450px] md:h-full md:w-1/3' : 'h-14 md:h-full md:w-12', 'border-t md:border-t-0 md:border-l']">
+                                 <div class="p-3 border-b border-gray-100 flex justify-between items-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors h-14 flex-shrink-0" @click="isNotePanelOpen = !isNotePanelOpen">
+                                      <div v-if="!isNotePanelOpen && windowWidth >= 768" class="hidden md:flex h-full w-full items-center justify-center"><i class="fas fa-pen-fancy text-medical-600"></i></div>
+                                      <div v-else class="flex items-center gap-2 w-full justify-between"><h4 class="text-sm font-bold text-gray-800 uppercase tracking-wider text-medical-600 flex items-center"><i class="fas fa-pen-fancy mr-2"></i> <span v-if="isNotePanelOpen">Nova Nota</span></h4><i class="fas text-gray-400" :class="isNotePanelOpen ? 'fa-chevron-down md:fa-chevron-right' : 'fa-chevron-up md:fa-chevron-left'"></i></div>
                                  </div>
-
-                                 <!-- Form Content -->
                                  <div v-show="isNotePanelOpen" class="flex-grow p-4 flex flex-col overflow-y-auto">
                                     <textarea v-model="newEvolutionText" class="w-full flex-grow p-3 border border-gray-300 rounded-md focus:ring-medical-500 resize-none text-sm bg-gray-50 mb-4" placeholder="Descreva o estado do paciente..."></textarea>
                                     <div class="flex items-center gap-2 mb-4"><input type="checkbox" id="isIntercurrence" v-model="isIntercurrence" class="h-4 w-4 text-red-600 rounded cursor-pointer"><label for="isIntercurrence" class="text-sm text-gray-700 font-medium cursor-pointer">Registrar como Intercorrência</label></div>
@@ -383,34 +362,33 @@
                                  </div>
                             </div>
                         </div>
-
                         <!-- PENDENCIAS -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center justify-between"><span><i class="fas fa-list-ul text-medical-600 mr-2"></i> Lista de Pendências</span><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{{ currentPendencies.length }}</span></h4>
+                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center justify-between"><span><i class="fas fa-list-ul text-medical-600 mr-2"></i> Pendências</span><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{{ currentPendencies.length }}</span></h4>
                                     <div class="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                                        <div v-for="task in currentPendencies" :key="task.id" :class="['p-3 rounded border flex items-start gap-3', 'bg-white hover:border-medical-300']">
-                                            <div class="flex-grow"><p class="text-sm text-gray-800">{{ task.description }}</p><div class="flex items-center gap-2 mt-1"><span :class="['text-[10px] px-1.5 py-0.5 rounded font-medium', getCategoryColor(task.category)]">{{ task.category }}</span></div></div>
-                                            <button @click="deletePendency(task.id)" class="text-gray-300 hover:text-red-500"><i class="fas fa-check-circle text-lg"></i></button>
-                                        </div>
+                                        <div v-for="task in currentPendencies" :key="task.id" :class="['p-3 rounded border flex items-start gap-3', 'bg-white hover:border-medical-300']"><div class="flex-grow"><p class="text-sm text-gray-800">{{ task.description }}</p><div class="flex items-center gap-2 mt-1"><span :class="['text-[10px] px-1.5 py-0.5 rounded font-medium', getCategoryColor(task.category)]">{{ task.category }}</span></div></div><button @click="deletePendency(task.id)" class="text-gray-300 hover:text-red-500"><i class="fas fa-check-circle text-lg"></i></button></div>
                                     </div>
                                 </div>
                                 <div class="bg-gray-50 p-6 rounded-lg border border-dashed border-gray-300 h-fit">
-                                    <h4 class="font-bold text-gray-700 mb-4">Adicionar Tarefa</h4>
-                                    <div class="space-y-4">
-                                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label><select v-model="newPendency.category" class="block w-full rounded-md border-gray-300 text-sm"><option value="Clínica Médica">Clínica Médica</option><option value="Neurologia">Neurologia</option><option value="Qualquer médico">Qualquer médico</option></select></div>
-                                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label><textarea v-model="newPendency.description" rows="3" class="block w-full rounded-md border-gray-300 text-sm"></textarea></div>
-                                        <button @click="addPendency" :disabled="!newPendency.description" class="w-full bg-medical-600 text-white py-2 rounded-md hover:bg-medical-700 text-sm font-medium">Adicionar</button>
-                                    </div>
+                                    <h4 class="font-bold text-gray-700 mb-4">Adicionar</h4>
+                                    <div class="space-y-4"><div><label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label><select v-model="newPendency.category" class="block w-full rounded-md border-gray-300 text-sm"><option value="Clínica Médica">Clínica Médica</option><option value="Neurologia">Neurologia</option><option value="Qualquer médico">Qualquer médico</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label><textarea v-model="newPendency.description" rows="3" class="block w-full rounded-md border-gray-300 text-sm"></textarea></div><button @click="addPendency" :disabled="!newPendency.description" class="w-full bg-medical-600 text-white py-2 rounded-md hover:bg-medical-700 text-sm font-medium">Adicionar</button></div>
                                 </div>
                             </div>
                         </div>
-                        <!-- PLANO -->
+                        <!-- PLANO & QUADRO CLINICO (EDITÁVEL) -->
                         <div v-if="activeTab === 'careplan'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Programação</h4><button @click="savePatients(selectedPatient); showNotification('Salvo!', 'success')" class="text-sm text-medical-600 hover:text-medical-800 font-medium">Salvar</button></div>
+                                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h4 class="font-bold text-gray-800"><i class="fas fa-bullseye text-medical-600 mr-2"></i> Programação & Dados Clínicos</h4><button @click="saveCarePlan" class="text-sm text-medical-600 hover:text-medical-800 font-medium bg-medical-50 px-3 py-1 rounded border border-medical-200 shadow-sm">Salvar Alterações</button></div>
                                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- QUADRO CLÍNICO EDITÁVEL -->
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="block text-sm font-bold text-gray-800 mb-2 border-l-4 border-medical-500 pl-2">Quadro Clínico e Comorbidades (Editável)</label>
+                                        <textarea v-model="selectedPatient.admissionNote" rows="4" class="w-full border-gray-300 rounded-md text-sm bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-medical-500 transition-colors p-3 shadow-inner"></textarea>
+                                        <p class="text-xs text-gray-400 mt-1"><i class="fas fa-info-circle mr-1"></i> Alterações neste campo serão registradas no histórico.</p>
+                                    </div>
+                                    <div class="col-span-1 md:col-span-2 border-t border-gray-100 my-2"></div>
                                     <div class="col-span-1 md:col-span-2 bg-yellow-50 p-4 rounded border border-yellow-200"><label class="block text-sm font-bold text-yellow-800 mb-1">Previsão Alta</label><input type="date" v-model="selectedPatient.carePlan.estimatedDate" class="block w-full md:w-1/3 rounded-md border-yellow-300 py-1.5 px-3 sm:text-sm"></div>
                                     <div class="col-span-1 md:col-span-2"><label class="block text-sm font-bold text-gray-700 mb-2">Metas Globais</label><textarea v-model="selectedPatient.carePlan.goals" rows="3" class="w-full border-gray-300 rounded-md"></textarea></div>
                                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Fisioterapia</label><input type="text" v-model="selectedPatient.carePlan.physio" class="w-full border-gray-300 rounded-md text-sm"></div>
@@ -425,7 +403,14 @@
                             <div class="bg-white flex-grow flex flex-col rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                                 <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
                                     <div><h4 class="font-bold text-gray-800">Relatório de Alta</h4><p class="text-xs text-gray-500">Texto corrido.</p></div>
-                                    <div class="flex gap-2"><button @click="copySummary" class="bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-1.5 rounded-md text-sm border border-purple-200">Copiar</button><button @click="savePatients(selectedPatient); showNotification('Salvo!', 'success')" class="bg-medical-600 text-white hover:bg-medical-700 px-3 py-1.5 rounded-md text-sm">Salvar</button></div>
+                                    <div class="flex gap-3 items-center">
+                                        <div class="flex items-center mr-4 bg-purple-50 px-3 py-1.5 rounded border border-purple-100">
+                                            <input type="checkbox" :checked="selectedPatient.prescriptionDone" @change="togglePrescription" class="h-4 w-4 text-purple-600 rounded cursor-pointer mr-2">
+                                            <div class="text-xs"><span class="block font-bold text-purple-800">Receita Feita</span><span v-if="selectedPatient.prescriptionDate" class="block text-[10px] text-purple-600">{{ formatDate(selectedPatient.prescriptionDate) }}</span></div>
+                                        </div>
+                                        <button @click="copySummary" class="bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-sm border border-gray-300">Copiar</button>
+                                        <button @click="savePatients(selectedPatient); showNotification('Salvo!', 'success')" class="bg-medical-600 text-white hover:bg-medical-700 px-3 py-1.5 rounded-md text-sm">Salvar</button>
+                                    </div>
                                 </div>
                                 <div class="flex-grow p-0"><textarea v-model="selectedPatient.dischargeSummary" class="w-full h-full p-6 resize-none focus:outline-none text-gray-700 text-base leading-relaxed" placeholder="Resumo do caso..."></textarea></div>
                             </div>
@@ -454,9 +439,10 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        try {
-            enableIndexedDbPersistence(db).catch(err => console.log("Persistência offline falhou:", err.code));
-        } catch(e) { console.log("Erro persistência:", e); }
+        const logAccess = async (pid, pname) => {
+            if(!auth.currentUser) return;
+            try { await addDoc(collection(db, 'access_logs'), { timestamp: new Date().toISOString(), user: auth.currentUser.email, patientId: pid, patientName: pname, action: 'VIEW' }); } catch(e) { console.error("Log error", e); }
+        };
 
         const { createApp, ref, computed, onMounted } = Vue;
 
@@ -477,14 +463,18 @@
                 const isIntercurrence = ref(false);
                 const searchQuery = ref('');
                 
-                // UX States
+                const viewMode = ref('grid'); 
+                const sortBy = ref('name'); 
+                const filterIntercurrence = ref(false);
                 const windowWidth = ref(window.innerWidth);
-                const isNotePanelOpen = ref(true); // Default open on desktop
+                const isNotePanelOpen = ref(true); 
                 
-                // Monitor resize for reactive layout
+                // Track original note state for audit
+                const originalAdmissionNote = ref(''); 
+                
                 window.addEventListener('resize', () => {
                     windowWidth.value = window.innerWidth;
-                    if(windowWidth.value < 768) isNotePanelOpen.value = false; // Auto close on mobile
+                    if(windowWidth.value < 768) isNotePanelOpen.value = false;
                 });
 
                 const currentEvolutions = ref([]);
@@ -506,12 +496,8 @@
 
                 const handleLogin = async () => {
                     isLoggingIn.value = true;
-                    try {
-                        await signInWithEmailAndPassword(auth, loginForm.value.email, loginForm.value.password);
-                        showNotification('Bem-vindo!', 'success');
-                    } catch (error) {
-                        showNotification(error.code === 'auth/invalid-credential' ? 'Credenciais inválidas.' : 'Erro ao entrar: ' + error.message, 'error');
-                    } finally { isLoggingIn.value = false; }
+                    try { await signInWithEmailAndPassword(auth, loginForm.value.email, loginForm.value.password); showNotification('Bem-vindo!', 'success'); } 
+                    catch (error) { showNotification('Erro ao entrar.', 'error'); } finally { isLoggingIn.value = false; }
                 };
 
                 const logout = async () => { await signOut(auth); showNotification('Sessão encerrada.', 'success'); };
@@ -526,7 +512,10 @@
                             pendingPreview: doc.data().pendingPreview || [],
                             pendingCount: doc.data().pendingCount || 0,
                             hasActiveIntercurrence: doc.data().hasActiveIntercurrence || false,
-                            lastVisit: doc.data().lastVisit || null
+                            lastVisit: doc.data().lastVisit || null,
+                            admissionNote: doc.data().admissionNote || '', 
+                            prescriptionDone: doc.data().prescriptionDone || false,
+                            prescriptionDate: doc.data().prescriptionDate || null
                         }));
                     });
                 };
@@ -534,8 +523,8 @@
                 const openPatientDetails = (p) => {
                     selectedPatientId.value = p.id;
                     activeTab.value = 'timeline';
-                    
-                    // Reset panel state based on device
+                    originalAdmissionNote.value = p.admissionNote; // Store for comparison
+                    logAccess(p.id, p.name);
                     isNotePanelOpen.value = window.innerWidth >= 768; 
                     
                     if(unsubscribeEvolutions) unsubscribeEvolutions();
@@ -549,20 +538,46 @@
                     });
                 };
 
-                const closePatientDetails = () => {
-                    selectedPatientId.value = null;
-                    currentEvolutions.value = [];
-                    currentPendencies.value = [];
-                };
+                const closePatientDetails = () => { selectedPatientId.value = null; currentEvolutions.value = []; currentPendencies.value = []; };
 
                 const updatePatientDoc = async (patientData) => {
                     if (!patientData || !patientData.id) return;
                     try {
                         const { id, ...data } = patientData;
                         await updateDoc(doc(db, 'patients', id), data);
-                    } catch (e) { 
-                        console.error(e);
-                        showNotification("Erro ao salvar: " + e.code, "error"); 
+                    } catch (e) { showNotification("Erro ao salvar.", "error"); }
+                };
+
+                // Lógica de Salvar Plano com Auditoria
+                const saveCarePlan = async () => {
+                    if (!selectedPatientId.value) return;
+                    
+                    const batch = writeBatch(db);
+                    const pid = selectedPatientId.value;
+                    const p = selectedPatient.value;
+
+                    // 1. Atualiza dados do paciente
+                    batch.update(doc(db, 'patients', pid), { 
+                        carePlan: p.carePlan,
+                        admissionNote: p.admissionNote // Novo valor do quadro clínico
+                    });
+
+                    // 2. Verifica se houve alteração no quadro clínico para gerar log
+                    if (p.admissionNote !== originalAdmissionNote.value) {
+                        batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
+                            date: new Date().toISOString(),
+                            note: '📝 Quadro clínico e comorbidades atualizado por ' + currentUser.value.email,
+                            author: 'Sistema',
+                            type: 'routine'
+                        });
+                        originalAdmissionNote.value = p.admissionNote; // Update reference
+                    }
+
+                    try {
+                        await batch.commit();
+                        showNotification('Plano e Quadro Clínico salvos!', 'success');
+                    } catch (e) {
+                        showNotification('Erro ao salvar.', 'error');
                     }
                 };
 
@@ -572,18 +587,23 @@
                     const pid = selectedPatientId.value;
                     const now = new Date().toISOString();
                     batch.update(doc(db, 'patients', pid), { lastVisit: now });
-                    batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
-                        date: now, note: 'Visita de rotina realizada.', author: currentUser.value.email, type: 'routine'
-                    });
+                    batch.set(doc(collection(db, 'patients', pid, 'evolutions')), { date: now, note: 'Visita de rotina realizada.', author: currentUser.value.email, type: 'routine' });
                     try { await batch.commit(); showNotification('Visita registrada!', 'success'); } catch (e) { showNotification('Erro.', 'error'); }
                 };
 
+                const togglePrescription = async (e) => {
+                    const isChecked = e.target.checked;
+                    const now = isChecked ? new Date().toISOString() : null;
+                    selectedPatient.value.prescriptionDone = isChecked;
+                    selectedPatient.value.prescriptionDate = now;
+                    await updatePatientDoc({ id: selectedPatient.value.id, prescriptionDone: isChecked, prescriptionDate: now });
+                };
+
+                const printList = () => { window.print(); };
+
                 const isVisitOverdue = (lastVisit) => {
                     if (!lastVisit) return true;
-                    const last = new Date(lastVisit);
-                    const now = new Date();
-                    const diffTime = Math.abs(now - last);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    const diffDays = Math.ceil(Math.abs(new Date() - new Date(lastVisit)) / (1000 * 60 * 60 * 24)); 
                     return diffDays >= 7;
                 };
 
@@ -600,33 +620,32 @@
                     const date = newPatient.value.admissionDate ? new Date(newPatient.value.admissionDate).toISOString() : new Date().toISOString();
                     const batch = writeBatch(db);
                     const newRef = doc(collection(db, 'patients'));
+                    
+                    const admissionNoteText = newPatient.value.notes || 'Admissão';
+
                     batch.set(newRef, {
                         ...newPatient.value, admissionDate: date, status: 'active',
                         carePlan: { goals: '', estimatedDate: '' }, dischargeSummary: '',
                         pendingPreview: [], pendingCount: 0, hasActiveIntercurrence: false,
-                        lastVisit: date
+                        lastVisit: date,
+                        admissionNote: admissionNoteText
                     });
                     batch.set(doc(collection(db, 'patients', newRef.id, 'evolutions')), {
-                        date: date, note: newPatient.value.notes || 'Admissão', author: currentUser.value.email, type: 'routine'
+                        date: date, note: admissionNoteText, author: currentUser.value.email, type: 'routine'
                     });
-                    try { await batch.commit(); showNotification('Cadastrado!', 'success'); closeModal(); } catch (e) { showNotification('Erro ao criar.', 'error'); }
+                    try { await batch.commit(); showNotification('Cadastrado!', 'success'); closeModal(); } catch (e) { showNotification('Erro.', 'error'); }
                 };
 
                 const startNewAdmission = (p) => {
-                    newPatient.value = {
-                        name: p.name, recordNumber: p.recordNumber, age: p.age, bed: '', diagnosis: p.diagnosis,
-                        notes: 'Nova admissão (Paciente readmitido)', admissionDate: getToday()
-                    };
+                    newPatient.value = { name: p.name, recordNumber: p.recordNumber, age: p.age, bed: '', diagnosis: p.diagnosis, notes: 'Nova admissão', admissionDate: getToday() };
                     showModal.value = true;
                 };
 
                 const addEvolution = async () => {
-                    if (!newEvolutionText.value.trim() || !selectedPatientId.value) return;
+                    if (!newEvolutionText.value.trim()) return;
                     const batch = writeBatch(db);
                     const pid = selectedPatientId.value;
-                    batch.set(doc(collection(db, 'patients', pid, 'evolutions')), {
-                        date: new Date().toISOString(), note: newEvolutionText.value, author: currentUser.value.email, type: isIntercurrence.value ? 'intercurrence' : 'routine'
-                    });
+                    batch.set(doc(collection(db, 'patients', pid, 'evolutions')), { date: new Date().toISOString(), note: newEvolutionText.value, author: currentUser.value.email, type: isIntercurrence.value ? 'intercurrence' : 'routine' });
                     if (isIntercurrence.value) batch.update(doc(db, 'patients', pid), { hasActiveIntercurrence: true });
                     try { await batch.commit(); newEvolutionText.value = ''; isIntercurrence.value = false; showNotification('Salvo!', 'success'); } catch (e) { showNotification('Erro.', 'error'); }
                 };
@@ -649,7 +668,7 @@
                     const newCount = Math.max(0, (selectedPatient.value.pendingCount || 1) - 1);
                     const newPreview = selectedPatient.value.pendingPreview.filter(p => p.description !== currentPendencies.value.find(c => c.id === taskId)?.description);
                     batch.update(doc(db, 'patients', pid), { pendingCount: newCount, pendingPreview: newPreview });
-                    try { await batch.commit(); } catch(e) { showNotification('Erro ao deletar.', 'error'); }
+                    try { await batch.commit(); } catch(e) { showNotification('Erro.', 'error'); }
                 };
 
                 const dischargePatient = async (p) => { await updatePatientDoc({ id: p.id, status: 'discharged', dischargeDate: new Date().toISOString() }); showNotification("Alta registrada.", "success"); };
@@ -668,18 +687,18 @@
                         const q = searchQuery.value.toLowerCase();
                         list = list.filter(p => p.name.toLowerCase().includes(q) || (p.recordNumber && p.recordNumber.toLowerCase().includes(q)));
                     }
-                    return list;
+                    if (filterIntercurrence.value) { list = list.filter(p => p.hasActiveIntercurrence); }
+                    return list.sort((a, b) => {
+                        if (sortBy.value === 'name') return a.name.localeCompare(b.name);
+                        const dateA = new Date(showHistory.value ? (a.dischargeDate || 0) : (a.admissionDate || 0));
+                        const dateB = new Date(showHistory.value ? (b.dischargeDate || 0) : (b.admissionDate || 0));
+                        return sortBy.value === 'dateDesc' ? dateB - dateA : dateA - dateB;
+                    });
                 });
+                
                 const activePatients = computed(() => patients.value.filter(p => p.status === 'active'));
 
-                // PWA Registration
-                if ('serviceWorker' in navigator) {
-                    window.addEventListener('load', () => {
-                        navigator.serviceWorker.register('./service-worker.js').then(reg => {
-                            reg.update();
-                        });
-                    });
-                }
+                if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js')); }
 
                 return {
                     isAuthenticated, isLoading, isLoggingIn, currentUser, loginForm, handleLogin, logout,
@@ -688,9 +707,8 @@
                     dischargePatient, startNewAdmission, activeTab, newEvolutionText, isIntercurrence, addEvolution,
                     newPendency, addPendency, deletePendency, copySummary, getCategoryColor, getInitials, formatDate,
                     savePatients: updatePatientDoc, notifications, currentEvolutions, currentPendencies, searchQuery, openPatientDetails, closePatientDetails,
-                    resolveIntercurrence, registerVisit, isVisitOverdue,
-                    // Mobile UX States
-                    windowWidth, isNotePanelOpen
+                    resolveIntercurrence, registerVisit, isVisitOverdue, windowWidth, isNotePanelOpen,
+                    viewMode, sortBy, filterIntercurrence, printList, togglePrescription, saveCarePlan
                 };
             }
         }).mount('#app');
