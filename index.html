@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeuroRehab Manager 4.5 (Datas Fix)</title>
+    <title>NeuroRehab Manager 4.6 (Print Fix)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -44,33 +44,49 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
         [v-cloak] { display: none; }
 
-        /* ESTILOS DE IMPRESSÃO (PDF OTIMIZADO) */
+        /* --- LÓGICA DE IMPRESSÃO ROBUSTA --- */
+        
+        /* 1. Na TELA (Normal): Esconde a seção de impressão */
+        @media screen {
+            #print-section {
+                display: none;
+            }
+        }
+
+        /* 2. NA IMPRESSORA (PDF): Esconde o App e mostra o Relatório */
         @media print {
-            body * { visibility: hidden; }
-            #app > div:not(#print-section) { display: none !important; }
-            #print-section, #print-section * { visibility: visible; display: block; }
-            #print-section { 
-                position: absolute; left: 0; top: 0; width: 100%; 
-                background: white; padding: 15px; 
-                font-family: Arial, sans-serif !important; 
-            }
+            @page { margin: 1cm; size: A4; }
             
-            #print-section table { 
-                display: table !important; 
-                width: 100%; 
-                border-collapse: collapse; 
-                font-size: 8pt !important; 
+            body { 
+                background-color: white; 
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact; /* Garante cores no PDF */
             }
-            #print-section thead { display: table-header-group !important; }
-            #print-section tbody { display: table-row-group !important; }
-            #print-section tr { display: table-row !important; page-break-inside: avoid; }
-            #print-section th, #print-section td { 
-                display: table-cell !important; 
-                border: 1px solid #000; 
-                padding: 4px; 
+
+            /* Esconde tudo que for filho direto do App, EXCETO a seção de impressão */
+            #app > :not(#print-section) {
+                display: none !important;
             }
-            #print-section th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
-            .no-print { display: none !important; }
+
+            /* Esconde notificações flutuantes e modais que possam estar abertos */
+            .fixed, .absolute {
+                display: none !important;
+            }
+
+            /* Mostra e formata a seção de impressão */
+            #print-section {
+                display: block !important;
+                position: static !important; /* Remove posicionamento absoluto para fluir na página */
+                width: 100%;
+                height: auto;
+                overflow: visible;
+            }
+
+            /* Estilo da Tabela de Impressão */
+            table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+            th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }
+            th { background-color: #f0f0f0 !important; font-weight: bold; }
+            tr { page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -79,7 +95,7 @@
     <div id="app" class="h-full flex flex-col" v-cloak>
 
         <!-- Notificações -->
-        <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none no-print">
+        <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
             <transition-group name="fade">
                 <div v-for="notif in notifications" :key="notif.id" 
                      :class="['px-4 py-3 rounded shadow-lg text-white flex items-center min-w-[250px] pointer-events-auto', notif.type === 'error' ? 'bg-red-500' : 'bg-green-600']">
@@ -89,57 +105,56 @@
             </transition-group>
         </div>
 
-        <!-- SEÇÃO DE IMPRESSÃO (PDF OTIMIZADO) -->
-        <div id="print-section" class="hidden">
+        <!-- SEÇÃO DE IMPRESSÃO (Controlada pelo CSS @media) -->
+        <div id="print-section">
             <div class="text-center mb-4 border-b pb-2">
                 <h1 class="text-xl font-bold text-black uppercase">Relatório de Pacientes - NeuroRehab</h1>
                 <p class="text-xs text-gray-600">Gerado em: {{ new Date().toLocaleString() }}</p>
             </div>
-            <table class="w-full text-left border-collapse">
+            <table>
                 <thead>
                     <tr>
-                        <th class="w-[20%]">Dados do Paciente</th>
-                        <th class="w-[30%]">Quadro Clínico</th>
-                        <th class="w-[20%]">Pendências</th>
-                        <th class="w-[10%]">Datas</th>
-                        <th class="w-[20%]">Observações (Mão)</th>
+                        <th style="width: 20%">Dados do Paciente</th>
+                        <th style="width: 30%">Quadro Clínico</th>
+                        <th style="width: 20%">Pendências</th>
+                        <th style="width: 10%">Datas</th>
+                        <th style="width: 20%">Observações (Mão)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="p in filteredPatients" :key="p.id">
-                        <td class="align-top">
+                        <td>
                             <div class="font-bold uppercase">{{ p.name }}</div>
                             <div>Pront: {{ p.recordNumber }}</div>
                             <div>Idade: {{ p.age }} anos</div>
                             <div v-if="p.profession">Prof: {{ p.profession }}</div>
                         </td>
-                        <td class="align-top text-justify">
+                        <td style="text-align: justify;">
                             {{ p.admissionNote || '-' }}
                         </td>
-                        <td class="align-top">
-                            <ul v-if="p.pendingPreview && p.pendingPreview.length" class="list-disc list-inside">
+                        <td>
+                            <ul v-if="p.pendingPreview && p.pendingPreview.length" style="list-style-type: disc; padding-left: 15px; margin: 0;">
                                 <li v-for="t in p.pendingPreview">{{ t.description }}</li>
                             </ul>
                             <span v-else> - </span>
                         </td>
-                        <td class="align-top">
+                        <td>
                             <div v-if="p.status === 'active'">
                                 <b>Prev. Alta:</b><br>
-                                <!-- ALTERADO: Mostra Previsão de Alta -->
                                 {{ formatDate(p.carePlan?.estimatedDate) || 'S/ Previsão' }}
                             </div>
                             <div v-else>
                                 <b>Alta:</b><br>{{ formatDate(p.dischargeDate) }}
                             </div>
                         </td>
-                        <td class="align-top"></td>
+                        <td><!-- Espaço para anotação manual --></td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
         <!-- TELA DE LOGIN -->
-        <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4 no-print">
+        <div v-if="!isAuthenticated && !isLoading" class="flex-grow flex items-center justify-center bg-medical-900 p-4">
             <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
                 <div class="text-center mb-8">
                     <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-medical-100 mb-4 text-medical-600"><i class="fas fa-brain text-4xl"></i></div>
@@ -158,7 +173,7 @@
         </div>
 
         <!-- DASHBOARD -->
-        <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100 no-print">
+        <div v-if="isAuthenticated && !isLoading" class="flex h-screen bg-gray-100">
             
             <!-- Sidebar -->
             <aside class="w-64 bg-white shadow-md flex-col hidden md:flex z-10">
@@ -239,15 +254,7 @@
                             <div class="p-5 border-b border-gray-100 flex justify-between items-start">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg border-2" :class="patient.hasActiveIntercurrence ? 'border-red-400 text-red-600 bg-red-50' : (isVisitOverdue(patient.lastVisit) ? 'border-orange-300 text-orange-600' : 'border-transparent')">{{ getInitials(patient.name) }}</div>
-                                    <div class="overflow-hidden">
-                                        <h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3>
-                                        <div class="flex flex-col">
-                                            <span class="text-xs text-gray-500">{{ patient.age }} anos</span>
-                                            <!-- ALTERADO: Mostra Previsão Alta ao invés de Adm -->
-                                            <span v-if="patient.status === 'active'" class="text-[10px] text-medical-600 font-bold">Prev. Alta: {{ formatDate(patient.carePlan?.estimatedDate) || '?' }}</span>
-                                            <span v-else class="text-[10px] text-gray-400">Alta: {{ formatDate(patient.dischargeDate) }}</span>
-                                        </div>
-                                    </div>
+                                    <div class="overflow-hidden"><h3 class="font-bold text-gray-800 truncate" :title="patient.name">{{ patient.name }}</h3><div class="flex flex-col"><span class="text-xs text-gray-500">{{ patient.age }} anos</span><span class="text-[10px] text-gray-400">Pront: {{ patient.recordNumber || 'N/A' }}</span></div></div>
                                 </div>
                                 <span :class="['px-2 py-1 text-xs rounded-full font-semibold', patient.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600']">{{ patient.status === 'active' ? 'Internado' : 'Alta' }}</span>
                             </div>
@@ -260,7 +267,7 @@
                                     <ul class="space-y-1"><li v-for="task in patient.pendingPreview" :key="task.description" class="text-xs text-gray-600 flex items-start gap-1.5 truncate"><i class="fas fa-circle text-[6px] text-yellow-500 mt-1.5 flex-shrink-0"></i><span class="truncate">{{ task.description }}</span></li></ul>
                                 </div>
                                 <div class="flex justify-between items-end border-t border-dashed pt-2 mt-2">
-                                    <div class="text-xs text-gray-400">Pront: {{ patient.recordNumber }}</div>
+                                    <div v-if="patient.carePlan && patient.carePlan.estimatedDate" class="text-sm"><span class="text-medical-600 text-xs font-bold uppercase tracking-wider block">Previsão Alta</span><span class="text-gray-800 font-bold bg-blue-50 px-2 py-0.5 rounded text-xs border border-blue-100">{{ formatDate(patient.carePlan.estimatedDate) }}</span></div>
                                     <div class="text-right text-xs"><span class="text-gray-400 block uppercase tracking-wider text-[10px]">Última Visita</span><span :class="['font-medium', isVisitOverdue(patient.lastVisit) ? 'text-orange-600 font-bold' : 'text-gray-600']">{{ formatDate(patient.lastVisit) || 'Nunca' }}</span></div>
                                 </div>
                             </div>
@@ -301,10 +308,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ patient.bed }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{{ patient.diagnosis }}</td>
-                                    <!-- ALTERADO: Coluna de Previsão de Alta -->
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                                        {{ formatDate(patient.carePlan?.estimatedDate) || '-' }}
-                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">{{ formatDate(patient.carePlan?.estimatedDate) || '-' }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -385,7 +389,7 @@
                                  </div>
                             </div>
                         </div>
-                        <!-- PENDENCIAS/PLANO (CÓDIGO ANTERIOR MANTIDO) -->
+                        <!-- PENDENCIAS (CÓDIGO ANTERIOR MANTIDO) -->
                         <div v-if="activeTab === 'pendencies'" class="absolute inset-0 p-6 overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                                 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
@@ -460,7 +464,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC7SO3tcBRmWpcOYSIOlq2u993pwQxkLTg",
@@ -503,11 +507,14 @@
                 const sortBy = ref('name'); 
                 const filterIntercurrence = ref(false);
                 const windowWidth = ref(window.innerWidth);
-                const isNotePanelOpen = ref(true); // Controle Manual
+                const isNotePanelOpen = ref(true); 
                 
                 const originalAdmissionNote = ref(''); 
                 
-                // REMOVIDO LISTENER DE RESIZE PARA CONTROLE MANUAL DO PAINEL
+                window.addEventListener('resize', () => {
+                    windowWidth.value = window.innerWidth;
+                    if(windowWidth.value < 768) isNotePanelOpen.value = false;
+                });
 
                 const currentEvolutions = ref([]);
                 const currentPendencies = ref([]);
@@ -558,7 +565,7 @@
                     activeTab.value = 'timeline';
                     originalAdmissionNote.value = p.admissionNote; 
                     logAccess(p.id, p.name);
-                    // MANTÉM ESTADO DO PAINEL MANUAL
+                    isNotePanelOpen.value = window.innerWidth >= 768; 
                     
                     if(unsubscribeEvolutions) unsubscribeEvolutions();
                     if(unsubscribePendencies) unsubscribePendencies();
